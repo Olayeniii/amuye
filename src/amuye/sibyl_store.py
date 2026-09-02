@@ -8,11 +8,11 @@ from sibyl_memory_client import MemoryClient
 from .domain import LearnedLesson
 
 
-LESSON_CATEGORY = "tadbir_operational_lesson"
+LESSON_CATEGORY = "amuye_operational_lesson"
 
 
 class SibylStore:
-    """The only persistent operational-memory store used by Tadbir."""
+    """The only persistent operational-memory store used by Amúyẹ."""
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = str(Path(database_path).resolve())
@@ -27,7 +27,7 @@ class SibylStore:
             },
             acted=["commissioned viability, risk synthesis, and security work up front"],
             forward=["purchase viability evidence before deeper specialist work"],
-            extra={"kind": "tadbir_execution", "executionRef": event_ref, "execution": execution},
+            extra={"kind": "amuye_execution", "executionRef": event_ref, "execution": execution},
         )
         return event_ref
 

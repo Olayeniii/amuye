@@ -6,9 +6,9 @@ import subprocess
 import sys
 from dataclasses import asdict
 
-from tadbir.checkpoint import execute_baseline
-from tadbir.demo import DEMO_REQUEST
-from tadbir.sibyl_store import SibylStore
+from amuye.checkpoint import execute_baseline
+from amuye.demo import DEMO_REQUEST
+from amuye.sibyl_store import SibylStore
 
 
 def test_checkpoint_one_survives_fresh_process_and_changes_plan(tmp_path):
@@ -18,7 +18,7 @@ def test_checkpoint_one_survives_fresh_process_and_changes_plan(tmp_path):
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(filter(None, ["src", env.get("PYTHONPATH")]))
     child = subprocess.run(
-        [sys.executable, "-m", "tadbir.fresh_session", "--memory-db", str(memory_db),
+        [sys.executable, "-m", "amuye.fresh_session", "--memory-db", str(memory_db),
          "--request-json", json.dumps(asdict(DEMO_REQUEST))],
         check=True,
         capture_output=True,
@@ -45,7 +45,7 @@ def test_no_memory_returns_baseline(tmp_path):
     env = os.environ.copy()
     env["PYTHONPATH"] = os.pathsep.join(filter(None, ["src", env.get("PYTHONPATH")]))
     child = subprocess.run(
-        [sys.executable, "-m", "tadbir.fresh_session", "--memory-db", str(tmp_path / "empty.db"),
+        [sys.executable, "-m", "amuye.fresh_session", "--memory-db", str(tmp_path / "empty.db"),
          "--request-json", request_json],
         check=True,
         capture_output=True,

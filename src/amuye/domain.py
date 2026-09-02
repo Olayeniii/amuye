@@ -34,7 +34,7 @@ class JobRequest:
         if missing:
             raise ValueError(f"missing request fields: {', '.join(missing)}")
         if value.get("taskClass", "protocol_assessment") != "protocol_assessment":
-            raise ValueError("Checkpoint 1 only accepts protocol_assessment")
+            raise ValueError("Amúyẹ currently accepts protocol_assessment only")
         if float(value["maxBudget"]) <= 0:
             raise ValueError("maxBudget must be greater than zero")
         return cls(
@@ -67,6 +67,23 @@ class TaskNode:
     startedAt: str | None = None
     completedAt: str | None = None
     mutationReason: str | None = None
+
+
+@dataclass
+class ProviderJob:
+    id: str
+    parentJobId: str
+    taskNodeId: str
+    providerId: str
+    providerRole: str
+    acpJobId: str
+    quotedCost: float
+    settledCost: float
+    status: str
+    submittedAt: str
+    completedAt: str | None
+    deliverableRef: str | None
+    evaluationRef: str | None
 
 
 @dataclass
@@ -122,4 +139,3 @@ class ReflectionResult:
 
 def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:12]}"
-

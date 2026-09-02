@@ -7,4 +7,15 @@ artifacts/
 *.db
 *.db-shm
 *.db-wal
-
+node_modules/
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+credentials.json
+credentials/
+secrets/
+*.secret

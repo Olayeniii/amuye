@@ -27,7 +27,7 @@ def run(memory_db: Path, output: Path) -> dict:
     output.parent.mkdir(parents=True, exist_ok=True)
     execution, reflection = execute_baseline(DEMO_REQUEST, SibylStore(memory_db))
     child = subprocess.run(
-        [sys.executable, "-m", "tadbir.fresh_session", "--memory-db", str(memory_db),
+        [sys.executable, "-m", "amuye.fresh_session", "--memory-db", str(memory_db),
          "--request-json", json.dumps(asdict(DEMO_REQUEST))],
         check=True,
         capture_output=True,
@@ -64,7 +64,7 @@ def run(memory_db: Path, output: Path) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run Tadbir Checkpoint 1")
+    parser = argparse.ArgumentParser(description="Run Amúyẹ Checkpoint 1")
     parser.add_argument("--memory-db", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

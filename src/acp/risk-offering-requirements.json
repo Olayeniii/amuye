@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "taskClass",
+    "role",
+    "objective",
+    "deadline",
+    "priority",
+    "hardConstraints",
+    "acceptedViabilityEvidence",
+    "requiredOutputContract"
+  ],
+  "properties": {
+    "taskClass": { "const": "protocol_assessment" },
+    "role": { "const": "risk_synthesis" },
+    "objective": { "type": "string" },
+    "deadline": { "type": "string" },
+    "priority": { "type": "string" },
+    "hardConstraints": { "type": "array", "items": { "type": "string" } },
+    "acceptedViabilityEvidence": {
+      "type": "object",
+      "required": [
+        "role",
+        "objectiveSatisfied",
+        "continueToRisk",
+        "gateReason",
+        "protocol",
+        "metrics",
+        "evidence"
+      ]
+    },
+    "requiredOutputContract": { "type": "object" }
+  },
+  "additionalProperties": false
+}
