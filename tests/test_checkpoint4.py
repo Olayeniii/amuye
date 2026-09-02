@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
+from pathlib import Path
 
 from amuye.acp import AcpPurchaseResult, AcpRiskAssessmentProvider, FakeAcpRiskClient
 from amuye.checkpoint import execute_baseline, plan_in_fresh_session
@@ -75,6 +77,12 @@ class LocalFixtureProvider:
 
 def provider(client, viability_outputs):
     return AcpRiskAssessmentProvider(client, LocalFixtureProvider(viability_outputs))
+
+
+def test_acp_offering_schema_uses_sdk_supported_draft():
+    schema_path = Path(__file__).parents[1] / "src/acp/risk-offering-requirements.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert schema["$schema"] == "http://json-schema.org/draft-07/schema#"
 
 
 def test_failed_viability_gate_creates_zero_acp_jobs(tmp_path):
