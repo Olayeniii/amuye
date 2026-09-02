@@ -71,10 +71,12 @@ async function main(): Promise<void> {
   seller.on("entry", async (session: JobSession, entry: JobRoomEntry) => {
     if (entry.kind === "message" && entry.contentType === "requirement" && session.status === "open") {
       try {
+        process.stderr.write(`[amuye-risk-provider] job ${session.jobId}: requirement received\n`);
         const requirement = JSON.parse(entry.content) as Record<string, unknown>;
         synthesizeRisk(requirement);
         requirements.set(session.jobId.toString(), requirement);
         await session.setBudget(AssetToken.usdc(offering.priceValue, session.chainId));
+        process.stderr.write(`[amuye-risk-provider] job ${session.jobId}: budget set to ${offering.priceValue} USDC\n`);
       } catch (error) {
         await session.sendMessage(String(error));
         await session.reject("invalid risk requirement");
@@ -82,9 +84,11 @@ async function main(): Promise<void> {
     }
     if (entry.kind === "system" && entry.event.type === "job.funded") {
       try {
+        process.stderr.write(`[amuye-risk-provider] job ${session.jobId}: funded\n`);
         const requirement = requirements.get(session.jobId.toString());
         if (!requirement) throw new Error("requirement not found in ACP context");
         await session.submit(JSON.stringify(synthesizeRisk(requirement)));
+        process.stderr.write(`[amuye-risk-provider] job ${session.jobId}: deliverable submitted\n`);
       } catch (error) {
         await session.sendMessage(String(error));
         await session.reject("risk synthesis failed");

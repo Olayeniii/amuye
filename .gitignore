@@ -19,3 +19,4 @@ credentials.json
 credentials/
 secrets/
 *.secret
+upload/

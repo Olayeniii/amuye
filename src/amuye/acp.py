@@ -47,7 +47,7 @@ class NodeAcpRiskClient:
         "ACP_RISK_OFFERING_NAME",
     )
 
-    def __init__(self, project_root: Path | None = None, timeout_seconds: float = 300) -> None:
+    def __init__(self, project_root: Path | None = None, timeout_seconds: float = 150) -> None:
         self.project_root = project_root or Path(__file__).resolve().parents[2]
         self.timeout_seconds = timeout_seconds
 
@@ -62,15 +62,14 @@ class NodeAcpRiskClient:
                 cwd=self.project_root,
                 input=json.dumps(payload),
                 text=True,
-                capture_output=True,
+                stdout=subprocess.PIPE,
                 timeout=self.timeout_seconds,
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
             raise AcpPurchaseError("ACP risk purchase timed out") from exc
         if not completed.stdout.strip():
-            detail = completed.stderr.strip()[-1000:]
-            raise AcpPurchaseError(f"ACP buyer returned no result: {detail}")
+            raise AcpPurchaseError("ACP buyer returned no lifecycle result")
         try:
             raw = json.loads(completed.stdout)
             result = AcpPurchaseResult(

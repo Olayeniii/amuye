@@ -27,6 +27,12 @@ const required = (name: string): string => {
   return value;
 };
 
+const log = (message: string): void => {
+  process.stderr.write(`[amuye-acp-buyer] ${message}\n`);
+};
+
+let liveBuyer: AcpAgent | null = null;
+
 const readInput = async (): Promise<Input> => {
   let body = "";
   for await (const chunk of process.stdin) body += chunk;
@@ -61,7 +67,9 @@ async function main(): Promise<void> {
   const buyer = await AcpAgent.create({
     evmProvider,
   });
+  liveBuyer = buyer;
   const buyerAddress = await buyer.getAddress();
+  log(`connected as ${buyerAddress}`);
   let current: Result | null = null;
   let active: JobSession | null = null;
   let resolved = false;
@@ -79,18 +87,23 @@ async function main(): Promise<void> {
     if (entry.kind !== "system") return;
     if (entry.event.type === "budget.set") {
       current.quotedCost = Number(entry.event.amount);
+      log(`job ${session.jobId}: provider quoted ${current.quotedCost} USDC`);
       if (current.quotedCost > input.maxCost) {
+        log(`job ${session.jobId}: quote rejected by budget policy`);
         await session.reject("budget over Amúyẹ authority");
         return;
       }
       await session.fetchJob();
       await session.fund();
+      log(`job ${session.jobId}: funded`);
     } else if (entry.event.type === "job.submitted") {
+      log(`job ${session.jobId}: deliverable received`);
       try {
         current.deliverable = parseRisk(entry.event.deliverable);
         current.deliverableRef = `acp:${session.jobId}:deliverable`;
         current.evaluationRef = `acp:${session.jobId}:self-evaluation`;
         await session.complete("Risk output contract accepted by Amúyẹ");
+        log(`job ${session.jobId}: deliverable accepted`);
       } catch (error) {
         current.error = String(error);
         await session.reject("malformed risk deliverable");
@@ -99,26 +112,31 @@ async function main(): Promise<void> {
       current.status = "completed";
       current.settledCost = current.quotedCost;
       current.completedAt = new Date().toISOString();
+      log(`job ${session.jobId}: completed`);
       await finish(current);
     } else if (entry.event.type === "job.rejected") {
       current.status = "rejected";
       current.settledCost = 0;
       current.completedAt = new Date().toISOString();
       current.error ||= entry.event.reason;
+      log(`job ${session.jobId}: rejected, ${current.error}`);
       await finish(current, 2);
     } else if (entry.event.type === "job.expired") {
       current.status = "expired";
       current.settledCost = 0;
       current.completedAt = new Date().toISOString();
       current.error = "ACP job expired";
+      log(`job ${session.jobId}: expired`);
       await finish(current, 2);
     }
   });
   await buyer.start();
+  log("event stream started");
   const agent = await buyer.getAgentByWalletAddress(providerAddress);
   if (!agent) throw new Error("registered ACP risk provider was not found");
   const offering = agent.offerings.find((item) => item.name === offeringName);
   if (!offering) throw new Error(`ACP offering not found: ${offeringName}`);
+  log(`provider offering found: ${offering.name} at ${offering.priceValue} USDC`);
   if (Number(offering.priceValue) > input.maxCost) {
     throw new Error("ACP offering price exceeds Amúyẹ remaining authority");
   }
@@ -142,20 +160,23 @@ async function main(): Promise<void> {
     submittedAt,
     completedAt: null,
   };
-  const timeoutMs = Number(process.env.ACP_JOB_TIMEOUT_MS || "300000");
+  log(`job ${jobId}: created`);
+  const timeoutMs = Number(process.env.ACP_JOB_TIMEOUT_MS || "120000");
   timer = setTimeout(async () => {
     if (active) await active.reject("Amúyẹ ACP timeout").catch(() => undefined);
     if (current) {
       current.status = "timeout";
       current.error = "ACP job timed out";
       current.completedAt = new Date().toISOString();
+      log(`job ${current.acpJobId}: timed out after ${timeoutMs}ms`);
       await finish(current, 2);
     }
   }, timeoutMs);
 }
 
 let timer: ReturnType<typeof setTimeout>;
-main().catch((error) => {
+main().catch(async (error) => {
   process.stderr.write(String(error));
+  if (liveBuyer) await liveBuyer.stop().catch(() => undefined);
   process.exitCode = 1;
 });
