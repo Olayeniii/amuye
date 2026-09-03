@@ -14,6 +14,8 @@ const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => (
 }[character]));
 const shortAddress = (value) => `${value.slice(0, 8)}...${value.slice(-6)}`;
 const money = (value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 3 });
+let liveJob = null;
+let pollTimer = null;
 
 function statusIcon(status) {
   return status === "completed" ? "✓" : status === "skipped" ? "−" : status === "cancelled" ? "×" : "•";
@@ -32,7 +34,7 @@ function graph(mode) {
         <dl class="node-meta">
           <div><dt>Depends on</dt><dd>${node.dependencies.length ? node.dependencies.map((id) => safe(roleById[id] || id)).join(", ") : "None"}</dd></div>
           <div><dt>Gate</dt><dd>${safe(node.gate || "No continuation gate")}</dd></div>
-          <div><dt>Cost</dt><dd>${money(node.cost)}</dd></div>
+          <div><dt>Cost</dt><dd>${money(node.cost)} budget units</dd></div>
         </dl>
         <p class="reason">${safe(node.reason || "Baseline node, no graph mutation")}</p>
       </div>
@@ -53,7 +55,7 @@ function evidence(mode) {
 function jobSummary(mode) {
   return `<section class="job-strip">
     <div class="job-objective"><span>Objective</span><strong>${safe(mode.request.objective)}</strong></div>
-    <div><span>Budget</span><strong>${money(mode.request.maxBudget)}</strong></div>
+    <div><span>Budget</span><strong>${money(mode.request.maxBudget)} units</strong></div>
     <div><span>Deadline</span><strong>${safe(new Date(mode.request.deadline).toLocaleDateString())}</strong></div>
     <div><span>Priority</span><strong>${safe(mode.request.priority)}</strong></div>
     <div class="constraints"><span>Hard constraints</span><strong>${mode.request.hardConstraints.map((item) => `<em>${safe(item)}</em>`).join("")}</strong></div>
@@ -61,6 +63,7 @@ function jobSummary(mode) {
 }
 
 function modePage(mode) {
+  const comparison = mode.key === "memory-off" || mode.key === "memory-on" ? `<div class="comparison-bar"><span>Controlled difference</span><b class="${mode.key === "memory-off" ? "selected" : ""}">Memory OFF · security purchased · 95 units</b><b class="${mode.key === "memory-on" ? "selected" : ""}">Memory ON · security skipped · 35 units</b></div>` : "";
   return `
     <main>
       <section class="result-hero">
@@ -69,8 +72,9 @@ function modePage(mode) {
           <h1>${safe(mode.result)}</h1>
           <p class="verified"><i>✓</i>${safe(mode.verification)}</p>
         </div>
-        <div class="spend-orb"><small>Spent</small><strong>${money(mode.execution.spent)}</strong><span>${money(mode.execution.remaining)} remaining</span></div>
+        <div class="spend-orb"><small>Spent</small><strong>${money(mode.execution.spent)}</strong><span>budget units</span><span>${money(mode.execution.remaining)} remaining</span></div>
       </section>
+      ${comparison}
       ${jobSummary(mode)}
       <div class="main-grid">
         <section class="panel graph-panel">
@@ -91,7 +95,7 @@ function modePage(mode) {
           </section>
           <section class="panel summary-panel">
             <div class="panel-label">Execution summary</div>
-            <div class="metric-row"><div><span>Spent</span><strong>${money(mode.execution.spent)}</strong></div><div><span>Unspent</span><strong>${money(mode.execution.remaining)}</strong></div></div>
+            <div class="metric-row"><div><span>Spent, units</span><strong>${money(mode.execution.spent)}</strong></div><div><span>Unspent, units</span><strong>${money(mode.execution.remaining)}</strong></div></div>
             <p><span>Purchased</span>${mode.execution.purchased.map((item) => `<b>${safe(labels[item.role])}</b>`).join("")}</p>
             <p><span>Early stop</span><b>${mode.execution.stoppedEarly ? safe(mode.execution.stopReason) : "No"}</b></p>
           </section>
@@ -106,6 +110,60 @@ function modePage(mode) {
         </section>
       </div>
     </main>`;
+}
+
+function newAssessmentPage() {
+  const defaultDeadline = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
+  return `<main>
+    <section class="result-hero form-hero"><div><p class="eyebrow">Live procurement run</p><h1>Commission a protocol assessment</h1><p class="verified">Amúyẹ owns planning, specialist selection, gates, evaluation, and learning.</p></div><div class="safety-note"><strong>No paid ACP jobs</strong><span>Live UI runs use the local specialist path. Job 75660 remains historical proof.</span></div></section>
+    <form id="assessment-form" class="panel assessment-form">
+      <label class="wide"><span>Objective</span><textarea name="objective" required>Assess protocol Aave for integration viability and material risks</textarea></label>
+      <label><span>Maximum budget, units</span><input name="maxBudget" type="number" min="1" step="0.1" value="100" required></label>
+      <label><span>Deadline</span><input name="deadline" type="datetime-local" value="${defaultDeadline}" required></label>
+      <label><span>Priority</span><select name="priority"><option>balanced</option><option>risk</option><option>urgent</option></select></label>
+      <label><span>Client ID</span><input name="clientId" value="ui-demo-client" required></label>
+      <label class="wide"><span>Hard constraints, one per line</span><textarea name="hardConstraints" required>protocolSlug=aave</textarea><small>Example: protocolSlug=aave. Add "security analysis is mandatory" to enforce security.</small></label>
+      <label class="memory-choice"><input name="memoryEnabled" type="checkbox" checked><span>Use Sibyl operational memory</span></label>
+      <div class="form-actions"><button type="submit">Run assessment</button><span>Task class: protocol_assessment</span></div>
+    </form>
+  </main>`;
+}
+
+function eventLabel(event) {
+  return ({ request_accepted: "Request accepted", intake_accepted: "Intake validated", memory_retrieval_started: "Sibyl retrieval", plan_created: "Plan created", graph_mutation: "Graph updated", specialist_purchase: `Purchased ${labels[event.role] || event.role}`, evidence_accepted: `Accepted ${labels[event.role] || event.role} evidence`, evaluation_completed: "Execution evaluated", reflection_completed: "Reflection completed", lesson_updated: "Sibyl lesson updated", execution_completed: "Result ready", execution_failed: "Execution failed" })[event.type] || event.type;
+}
+
+function liveProgressPage(job) {
+  const result = job.result;
+  if (result) return modePage(liveResultToMode(result));
+  return `<main><section class="result-hero"><div><p class="eyebrow">Live run</p><h1>${job.error ? "Assessment failed" : "Amúyẹ is executing the assessment"}</h1><p class="verified"><i>${job.error ? "×" : "•"}</i>${safe(job.error || "Polling real backend state")}</p></div><div class="spend-orb"><small>Status</small><strong class="status-word">${safe(job.status)}</strong><span>local specialists</span></div></section>
+    ${job.request ? jobSummary({ request: job.request }) : ""}
+    <section class="panel timeline-panel"><div class="section-head"><div><p class="eyebrow">Backend events</p><h2>Live execution</h2></div><span>${job.events.length} events</span></div><div class="timeline">${job.events.map((event) => `<div><i></i><strong>${safe(eventLabel(event))}</strong><span>${safe(new Date(event.at).toLocaleTimeString())}</span>${event.reason ? `<small>${safe(event.reason)}</small>` : ""}</div>`).join("")}</div></section></main>`;
+}
+
+function liveResultToMode(result) {
+  const nodes = result.execution.nodes;
+  const outputs = result.finalResult.evidence;
+  const recalled = result.memory.recalledLessonIds;
+  return {
+    eyebrow: "Live procurement result",
+    result: result.finalResult.decision,
+    verification: result.finalResult.verification,
+    request: result.request,
+    memory: { enabled: result.memory.enabled, lessonId: recalled[0] || null, applicability: result.memory.applicability, influencedRule: recalled.length ? result.strategy.rationale : "No operational lesson influenced this plan.", adapted: result.strategy.source === "adapted", adaptationReason: result.strategy.source === "adapted" ? result.strategy.applicabilityAssessment : null },
+    graph: nodes.map((node) => ({ id: node.id, role: node.type, status: node.status, dependencies: node.dependencies, gate: node.conditionalTrigger, cost: node.actualCost, reason: node.mutationReason, verification: node.evaluationStatus })),
+    mutations: result.execution.mutations,
+    execution: { purchased: result.execution.purchasedRoles.map((role) => ({ role })), order: result.execution.purchasedRoles, spent: result.execution.spent, remaining: result.execution.remainingBudget, stoppedEarly: result.execution.stoppedEarly, stopReason: result.execution.stopReason },
+    evidence: outputs,
+    learning: { reflection: [...result.reflection.successfulDecisions, ...result.reflection.failedDecisions].join(" ") || "Execution evaluated before reflection.", decision: result.lessonUpdate ? `${result.lessonUpdate.action} ${result.lessonUpdate.lesson.id}` : "Execution recorded, no lesson mutation required", lessonId: result.lessonUpdate?.lesson?.id || recalled[0] || "None", evidenceRefs: result.reflection.evidenceRefs, confirmed: true },
+  };
+}
+
+async function pollJob(statusUrl) {
+  const response = await fetch(statusUrl);
+  liveJob = await response.json();
+  if (location.hash === "#live-run") render();
+  if (!["completed", "failed"].includes(liveJob.status)) pollTimer = setTimeout(() => pollJob(statusUrl), 450);
 }
 
 function proofPage() {
@@ -124,7 +182,28 @@ function proofPage() {
 function render() {
   const route = location.hash.slice(1) || "memory-on";
   const mode = data.modes.find((item) => item.key === route) || data.modes[1];
-  app.innerHTML = `<header><a class="brand" href="#memory-on"><img src="./assets/amuye-logo.png" alt="Amúyẹ"/><span><strong>Amúyẹ</strong><small>Procurement intelligence</small></span></a><nav>${data.modes.map((item) => `<a class="${route === item.key ? "active" : ""}" href="#${item.key}">${safe(item.label)}</a>`).join("")}<a class="${route === "partner-proof" ? "active" : ""}" href="#partner-proof">Partner proof</a></nav><span class="live"><i></i>Evidence loaded</span></header>${route === "partner-proof" ? proofPage() : modePage(mode)}<footer><span>Amúyẹ</span><p>Specialist procurement shaped by execution evidence.</p></footer>`;
+  const content = route === "new-assessment" ? newAssessmentPage() : route === "live-run" ? (liveJob ? liveProgressPage(liveJob) : newAssessmentPage()) : route === "partner-proof" ? proofPage() : modePage(mode);
+  const evidenceRoute = data.modes.some((item) => item.key === route) || route === "partner-proof";
+  app.innerHTML = `<header><a class="brand" href="#memory-on"><img src="./assets/amuye-logo.png" alt="Amúyẹ"/><span><strong>Amúyẹ</strong><small>Procurement intelligence</small></span></a><nav><a class="new-action ${route === "new-assessment" || route === "live-run" ? "active" : ""}" href="#new-assessment">New Assessment</a>${data.modes.map((item) => `<a class="${route === item.key ? "active" : ""}" href="#${item.key}">${safe(item.label)}</a>`).join("")}<a class="${route === "partner-proof" ? "active" : ""}" href="#partner-proof">Partner proof</a></nav><span class="live"><i></i>${evidenceRoute ? "Reproducible proof" : "Live backend"}</span></header>${content}<footer><span>Amúyẹ</span><p>Procurement decisions shaped by execution evidence.</p></footer>`;
+
+  document.querySelector("#assessment-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const request = { objective: form.get("objective"), maxBudget: Number(form.get("maxBudget")), deadline: new Date(form.get("deadline")).toISOString(), priority: form.get("priority"), hardConstraints: String(form.get("hardConstraints")).split("\n").map((item) => item.trim()).filter(Boolean), clientId: form.get("clientId"), taskClass: "protocol_assessment" };
+    event.currentTarget.querySelector("button").disabled = true;
+    try {
+      const memory = form.get("memoryEnabled") ? "on" : "off";
+      const response = await fetch(`/api/assessments?memory=${memory}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+      const accepted = await response.json();
+      if (!response.ok) throw new Error(accepted.error || "Assessment was rejected");
+      liveJob = { id: accepted.jobId, status: accepted.status, request, events: [], result: null, error: null };
+      location.hash = "live-run";
+      pollJob(accepted.statusUrl);
+    } catch (error) {
+      alert(error.message);
+      event.currentTarget.querySelector("button").disabled = false;
+    }
+  });
 }
 
 addEventListener("hashchange", render);

@@ -141,9 +141,9 @@ npm install
   --output artifacts/live/aave.json
 ```
 
-## Judge console
+## Live console and client API
 
-The console reads tracked proof artifacts during its build. It has separate screens for memory OFF, memory ON, mandatory-security adaptation, and verified ACP/Base settlement.
+The console has two clearly separated uses. `New Assessment` runs the real Amúyẹ application path. The Memory OFF, Memory ON, mandatory-security, and partner-proof screens render tracked evidence for repeatable judging.
 
 ```bash
 npm run build
@@ -151,6 +151,37 @@ npm run console
 ```
 
 Open `http://localhost:4173`. In Codespaces, open port `4173` from the Ports panel.
+
+Live UI runs use local protocol specialists and cannot spend ACP funds. Set `AMUYE_MEMORY_DB` to choose the Sibyl database. The default is `artifacts/live/sibyl.db`.
+
+Another agent or client can submit the same request contract without the frontend:
+
+```bash
+curl -X POST 'http://localhost:4173/api/assessments?memory=on' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "objective": "Assess protocol Aave for integration",
+    "maxBudget": 100,
+    "deadline": "2026-09-10T18:00:00Z",
+    "priority": "balanced",
+    "hardConstraints": ["protocolSlug=aave"],
+    "clientId": "demo-client",
+    "taskClass": "protocol_assessment"
+  }'
+```
+
+The response is `202 Accepted` with a `jobId` and `statusUrl`:
+
+```json
+{
+  "jobId": "api_job_...",
+  "status": "accepted",
+  "statusUrl": "/api/assessments/api_job_...",
+  "providerMode": "local specialists, no ACP payment"
+}
+```
+
+Poll `GET /api/assessments/{jobId}`. It returns current status, ordered execution events, and, once complete, the strategy, graph, purchases, evidence, spend, evaluation, reflection, Sibyl references, and final result. `memory=off` disables operational-memory retrieval for a controlled cold run. It does not change provider behavior or policy enforcement.
 
 ## Tests
 

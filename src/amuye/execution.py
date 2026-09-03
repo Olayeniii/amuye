@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .domain import ExecutionStrategy, JobRequest, ProviderJob, TaskNode, new_id, utc_now
 
@@ -288,6 +288,7 @@ class ExecutionController:
         provider: SpecialistProvider,
         *,
         max_replacements_per_role: int = 1,
+        event_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.request = request
         self.strategy = strategy
@@ -301,6 +302,15 @@ class ExecutionController:
         self.stopped_early = False
         self.stop_reason: str | None = None
         self.provider_jobs: list[ProviderJob] = []
+        self.event_callback = event_callback
+        if event_callback is not None:
+            original_record = self.graph._record
+
+            def record_and_emit(*args: Any, **kwargs: Any) -> None:
+                original_record(*args, **kwargs)
+                event_callback({"type": "graph_mutation", **asdict(self.graph.mutations[-1])})
+
+            self.graph._record = record_and_emit  # type: ignore[method-assign]
 
     def _mandatory_security_required(self) -> bool:
         normalized = " ".join(self.request.hardConstraints).lower().replace("-", " ").replace("_", " ")
@@ -386,6 +396,13 @@ class ExecutionController:
                 self.graph.transition(node, "running", "dependencies and policy checks passed; specialist work purchased")
                 node.startedAt = utc_now()
                 context = self._specialist_context()
+                if self.event_callback is not None:
+                    self.event_callback({
+                        "type": "specialist_purchase",
+                        "role": node.type,
+                        "estimatedCost": node.estimatedCost,
+                        "remainingBudget": self.request.maxBudget - self.spent,
+                    })
                 node.inputRefs = [f"evidence:{node_id}" for node_id, output in self.outputs.items()
                                   if self.graph.nodes[node_id].status == "completed"]
                 raw_evidence: Any = None
@@ -423,6 +440,14 @@ class ExecutionController:
                 if evidence.status == "completed":
                     node.evaluationStatus = "passed"
                     self.graph.transition(node, "completed", "specialist evidence received and accepted")
+                    if self.event_callback is not None:
+                        self.event_callback({
+                            "type": "evidence_accepted",
+                            "role": node.type,
+                            "evidence": evidence.findings,
+                            "spent": self.spent,
+                            "remainingBudget": self.request.maxBudget - self.spent,
+                        })
                     if (evidence.findings.get("objectiveSatisfied") is True
                             and not (self._mandatory_security_required()
                                      and not self._mandatory_security_completed())):
