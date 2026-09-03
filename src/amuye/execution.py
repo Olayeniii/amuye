@@ -302,6 +302,16 @@ class ExecutionController:
         self.stop_reason: str | None = None
         self.provider_jobs: list[ProviderJob] = []
 
+    def _mandatory_security_required(self) -> bool:
+        normalized = " ".join(self.request.hardConstraints).lower().replace("-", " ").replace("_", " ")
+        return "mandatory security" in normalized or "security analysis is mandatory" in normalized
+
+    def _mandatory_security_completed(self) -> bool:
+        return any(
+            node.type == "security_analysis" and node.status == "completed"
+            for node in self.graph.active_nodes()
+        )
+
     def _specialist_context(self) -> dict[str, dict[str, Any]]:
         context: dict[str, dict[str, Any]] = {}
         for node_id, output in self.outputs.items():
@@ -311,6 +321,8 @@ class ExecutionController:
         return context
 
     def _gate_satisfied(self, node: TaskNode) -> tuple[bool, str]:
+        if node.type == "security_analysis" and self._mandatory_security_required():
+            return True, "security continuation gate overridden by hard client constraint: mandatory security analysis"
         if not node.conditionalTrigger:
             return True, "node has no continuation gate"
         dependency_outputs = [self.outputs.get(item, {}) for item in node.dependencies]
@@ -411,7 +423,9 @@ class ExecutionController:
                 if evidence.status == "completed":
                     node.evaluationStatus = "passed"
                     self.graph.transition(node, "completed", "specialist evidence received and accepted")
-                    if evidence.findings.get("objectiveSatisfied") is True:
+                    if (evidence.findings.get("objectiveSatisfied") is True
+                            and not (self._mandatory_security_required()
+                                     and not self._mandatory_security_completed())):
                         self.stopped_early = True
                         self.stop_reason = f"objective satisfied by {node.type} evidence"
                         self._skip_remaining(self.stop_reason)

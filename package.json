@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "acp:risk-seller": "tsx src/acp/risk-seller.ts",
+    "build": "node frontend/build.mjs",
+    "console": "node frontend/serve.mjs",
     "typecheck": "tsc --noEmit --skipLibCheck --module nodenext --moduleResolution nodenext --target es2022 --types node src/acp/risk-buyer.ts src/acp/risk-seller.ts"
   },
   "dependencies": {

@@ -1,63 +1,163 @@
 # Amúyẹ
 
-Give Amúyẹ a job, budget, and deadline. It commissions specialist agents as needed, learns from every execution, and applies that experience to the next one.
+Give Amúyẹ a job, budget, and deadline. It commissions specialist agents as needed, learns from execution, and applies that experience to later work.
 
-This repository currently implements Checkpoints 1 through 4:
+Amúyẹ handles one task class: protocol assessment. It can commission viability and onchain analysis, risk synthesis, and security analysis.
 
-`task -> baseline execution -> reflection -> Sibyl write -> fresh session -> Sibyl retrieval -> changed plan`
+The main product behavior is progressive purchasing. Amúyẹ gathers cheap, useful evidence first, then buys deeper work only when accepted evidence and client constraints support it. Budget and hard-constraint enforcement remain outside memory reasoning.
 
-Checkpoint 2 executes that plan through a mutable protocol-assessment graph. It enforces dependencies and budget, evaluates evidence gates before deeper purchases, skips unjustified work, replaces failed nodes, records every mutation reason, and stops when the objective is satisfied.
+## Architecture
 
-Checkpoint 3 supplies real role behavior. Viability reads public DefiLlama protocol data, risk synthesis consumes the viability result, and security analysis consumes both prior outputs. Every completed output is validated before the graph accepts it.
+1. Intake validates the request, budget, deadline, and hard constraints.
+2. Sibyl retrieval finds structurally relevant operational lessons.
+3. Planning creates either a cold baseline or a memory-informed graph.
+4. The execution controller enforces dependencies, gates, budget, early stopping, replacement, and mutation reasons.
+5. Role-specific validation checks specialist outputs.
+6. Evaluation and reflection run before any operational lesson mutation.
+7. Execution history and lessons are persisted through Sibyl.
 
-Checkpoint 4 keeps viability and security local, but purchases gated risk synthesis through the official Virtuals ACP Node v2 client flow. Base-specific work beyond ACP settlement and the frontend remain deferred.
+Viability and security use the local specialist runtime. Risk synthesis can use either the deterministic adapter or a real Virtuals ACP provider purchase.
 
-## Run the proof
+## Why Sibyl is load-bearing
+
+The core product value is not simple routing. Amúyẹ learns how specialist work should be purchased, ordered, checked, and stopped.
+
+The official `sibyl-memory-client` stores execution journal events and current operational lessons. A separate process can retrieve a lesson, assess its applicability, reference its ID in the plan, and change a real purchase. Amúyẹ does not maintain a second operational-memory database.
+
+### Exact Sibyl paths
+
+- Write execution evidence: `SibylStore.write_execution_history()` in `src/amuye/sibyl_store.py`
+- Write or update lessons: `SibylStore.write_lesson()` in `src/amuye/sibyl_store.py`
+- Retrieve relevant lessons: `SibylStore.retrieve_lessons()` in `src/amuye/sibyl_store.py`
+- Retrieve one current lesson: `SibylStore.get_lesson()` in `src/amuye/sibyl_store.py`
+- Fresh-session planning entry: `plan_in_fresh_session()` in `src/amuye/checkpoint.py`
+- Lesson mutation flow: `learn_from_execution()` in `src/amuye/learning.py`
+
+`write_execution_history()` returns the real Sibyl journal-event ID. Supporting and contradictory lesson references use those journal IDs while Amúyẹ execution IDs remain in the event metadata.
+
+## Fresh-session and controlled memory proof
+
+The fresh-session proof runs planning in a new process with no conversation history. Sibyl returns `lesson_progressive_specialist_purchasing_v1`, and the planner changes the graph from unconditional purchases to:
+
+```text
+viability -> viability gate -> risk synthesis -> risk gate -> security analysis
+```
+
+The controlled comparison uses the same request, provider profile, prices, controller, evidence, and runtime:
+
+| Run | Memory | Specialists purchased | Spend |
+| --- | --- | --- | ---: |
+| A | OFF | viability, risk, security | 95 |
+| B | ON | viability, risk | 35 |
+
+Risk evidence returns `continueToSecurity: false`. Run B skips the security purchase and traces that action to the recalled Sibyl lesson ID.
+
+```bash
+.venv/bin/python -m amuye.demo_memory_control \
+  --memory-db artifacts/memory-control/sibyl.db \
+  --output artifacts/memory-control/comparison.json
+```
+
+## Changed-constraint adaptation
+
+A related request makes security analysis mandatory. Amúyẹ still retrieves the progressive lesson and keeps viability-first ordering plus the viability-to-risk gate. It identifies the conflict with the normal security gate and overrides only that rule for the current job.
+
+Security runs even when risk returns `continueToSecurity: false`. The hard constraint is enforced by the planner and execution controller. The stored lesson is unchanged, and a later ordinary task can still use its original security gate.
+
+```bash
+.venv/bin/python -m amuye.demo_constraint_adaptation \
+  --memory-db artifacts/constraint-adaptation/sibyl.db \
+  --output artifacts/constraint-adaptation/result.json
+```
+
+## Virtuals ACP integration
+
+Amúyẹ is the ACP buyer. A separately registered provider exposes the `riskSynthesis` offering through Virtuals ACP. When viability permits continuation, the buyer sends the accepted viability output as `acceptedViabilityEvidence`.
+
+The lifecycle is:
+
+```text
+createJobFromOffering -> budget.set -> fund -> submit -> self-evaluation -> complete
+```
+
+The deliverable is converted into the same validated risk specialist contract used by the local controller. Failures, malformed deliverables, rejection, and timeouts follow the provider failure and replacement path. ACP costs count against the client budget.
+
+Set the registered provider and buyer values using `.env.example`. Keep the provider running in one terminal:
+
+```bash
+set -a
+source .env
+set +a
+npm run acp:risk-seller
+```
+
+Run the buyer from a second terminal:
+
+```bash
+set -a
+source .env
+set +a
+.venv/bin/python -m amuye.demo_acp \
+  --protocol aave \
+  --memory-db artifacts/acp/sibyl.db \
+  --output artifacts/acp/aave.json
+```
+
+## Base settlement proof
+
+Virtuals ACP job `75660` completed on Base mainnet. Verified accounting:
+
+- 0.1 USDC moved from the buyer into ACP escrow.
+- 0.09 USDC was released to the risk provider.
+- 0.005 USDC was paid to the evaluator.
+- 0.005 USDC was paid to the platform treasury.
+
+Funding and completion were separate successful Base transactions:
+
+- [Funding transaction on BaseScan](https://basescan.org/tx/0xe28f073db856502b6c18446d687db7eac361085c859082905614f728dd6b8348)
+- [Completion and release transaction on BaseScan](https://basescan.org/tx/0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369)
+- [ACP contract on BaseScan](https://basescan.org/address/0x238e541bfefd82238730d00a2208e5497f1832e0#readProxyContract)
+
+The settlement record separates job budget, escrowed funds, provider release, evaluator fee, and platform fee. Verify it again without creating a transaction:
+
+```bash
+.venv/bin/python -m amuye.demo_settlement \
+  --job-id 75660 \
+  --output artifacts/base/job-75660-settlement.json
+```
+
+## Setup and local assessment
 
 ```bash
 python -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-.venv/bin/python -m amuye.demo --memory-db artifacts/checkpoint1/sibyl.db --output artifacts/checkpoint1/report.json
-```
-
-Run a live protocol assessment:
-
-```bash
-.venv/bin/python -m amuye.demo_checkpoint3 --protocol aave --memory-db artifacts/checkpoint3/sibyl.db --output artifacts/checkpoint3/aave.json
-```
-
-Run the live ACP path after registering a Amúyẹ buyer and a risk provider in the Virtuals Service Registry, funding the buyer wallet, installing Node dependencies, and exporting the values in `.env.example`:
-
-Register the provider offering with the exact name in `ACP_RISK_OFFERING_NAME`, a fixed USDC price no greater than Amúyẹ's risk-node authority, and the requirement schema in `src/acp/risk-offering-requirements.json`. The buyer and provider must use different registered wallets.
-
-```bash
 npm install
-set -a; . ./.env; set +a
-npm run acp:risk-seller # keep this running in terminal 1
-.venv/bin/python -m amuye.demo_checkpoint4 --protocol aave --memory-db artifacts/checkpoint4/sibyl.db --output artifacts/checkpoint4/aave-acp.json
 ```
 
-The ACP lifecycle is `createJobFromOffering -> budget.set -> fund -> job.submitted -> self-evaluation -> complete`. The provider request contains the full accepted viability output under `acceptedViabilityEvidence`. Amúyẹ rejects an offering price or quote above remaining budget before settlement.
+```bash
+.venv/bin/python -m amuye.demo_assessment \
+  --protocol aave \
+  --memory-db artifacts/live/sibyl.db \
+  --output artifacts/live/aave.json
+```
 
-The command starts a child Python process for the second plan. That process receives only the serialized request and the Sibyl database path. It does not receive the first plan, execution, reflection, or lesson.
+## Judge console
 
-Run tests:
+The console reads tracked proof artifacts during its build. It has separate screens for memory OFF, memory ON, mandatory-security adaptation, and verified ACP/Base settlement.
+
+```bash
+npm run build
+npm run console
+```
+
+Open `http://localhost:4173`. In Codespaces, open port `4173` from the Ports panel.
+
+## Tests
 
 ```bash
 .venv/bin/pytest
+npm run typecheck
+npm run build
 ```
 
-## Checkpoint 1 code paths
-
-- Sibyl read and write: `src/amuye/sibyl_store.py`
-- Baseline and memory-aware planning: `src/amuye/planner.py`
-- Baseline execution and reflection: `src/amuye/checkpoint.py`
-- Fresh-process test: `src/amuye/demo.py`
-- Mutable graph and progressive controller: `src/amuye/execution.py`
-- Real protocol specialists and public data adapter: `src/amuye/specialists.py`
-- ACP risk adapter and ProviderJob mapping: `src/amuye/acp.py`
-- Official ACP Node v2 buyer lifecycle: `src/acp/risk-buyer.ts`
-
-## Memory is load-bearing
-
-Without the operational lesson retrieved from Sibyl, Amúyẹ returns the baseline plan and commissions all three roles immediately. With the lesson, it changes the graph to progressive purchasing: viability runs first, risk is gated by viability evidence, and security is gated by risk evidence. Removing the Sibyl database removes that learned behavior.
+Python tests use deterministic providers and mocked Base RPC responses. CI does not need Virtuals or Base network access.

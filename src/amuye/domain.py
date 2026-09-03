@@ -86,6 +86,59 @@ class ProviderJob:
     evaluationRef: str | None
 
 
+@dataclass(frozen=True)
+class SettlementTransactionProof:
+    lifecycleEvent: str
+    transactionHash: str
+    blockNumber: int
+    receiptStatus: int | None
+    outerTransactionFrom: str | None
+    outerTransactionTo: str | None
+    explorerUrl: str
+
+
+@dataclass(frozen=True)
+class TokenMovementProof:
+    purpose: str
+    transactionHash: str
+    logIndex: int
+    token: str
+    source: str
+    destination: str
+    rawAmount: int
+    amount: float
+    asset: str
+
+
+@dataclass(frozen=True)
+class SettlementProof:
+    chainId: int
+    network: str
+    acpContract: str
+    usdcContract: str
+    jobId: str
+    buyer: str
+    provider: str
+    evaluator: str
+    treasury: str
+    jobStatus: str
+    jobStatusCode: int
+    jobBudget: float
+    escrowedAmount: float
+    providerReleasedAmount: float
+    evaluatorFeeAmount: float
+    platformFeeAmount: float
+    funding: SettlementTransactionProof
+    completion: SettlementTransactionProof
+    lifecycleTransactions: list[SettlementTransactionProof]
+    escrowTransfer: TokenMovementProof
+    completionTransfers: list[TokenMovementProof]
+    contractJobUrl: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 @dataclass
 class ExecutionStrategy:
     jobId: str
@@ -132,9 +185,43 @@ class ReflectionResult:
     proposedLessons: list[LearnedLesson]
     evidenceRefs: list[str]
     confidence: float
+    usefulSequencing: list[str] = field(default_factory=list)
+    proposedStrategyChanges: list[str] = field(default_factory=list)
+    lessonMutationProposals: list["LessonMutationProposal"] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExecutionEvaluation:
+    executionId: str
+    relationToLesson: Literal["supporting", "contradictory"]
+    outcome: str
+    successfulDecisions: list[str]
+    failedDecisions: list[str]
+    unnecessaryPurchases: list[str]
+    missedDependencies: list[str]
+    usefulSequencing: list[str]
+    proposedStrategyChanges: list[str]
+    evidenceStrength: Literal["ordinary", "strong"] = "ordinary"
+    independentlyVerified: bool = False
+    materialHarm: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class LessonMutationProposal:
+    lessonId: str
+    action: Literal["strengthen", "weaken", "narrow", "broaden", "uncertain", "supersede"]
+    reason: str
+    evidenceRef: str
+    addApplicabilityConditions: list[str] = field(default_factory=list)
+    addNonApplicabilityConditions: list[str] = field(default_factory=list)
+    removeApplicabilityConditions: list[str] = field(default_factory=list)
+    removeNonApplicabilityConditions: list[str] = field(default_factory=list)
 
 
 def new_id(prefix: str) -> str:

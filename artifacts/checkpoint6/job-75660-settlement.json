@@ -1,0 +1,133 @@
+{
+  "settlementProof": {
+    "chainId": 8453,
+    "network": "Base mainnet",
+    "acpContract": "0x238e541bfefd82238730d00a2208e5497f1832e0",
+    "usdcContract": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "jobId": "75660",
+    "buyer": "0x6d0355d3f32789eed1099020209f5cb4f564761f",
+    "provider": "0xad72f78ef0ef88aaab8a3c66aacd077396187f0a",
+    "evaluator": "0x6d0355d3f32789eed1099020209f5cb4f564761f",
+    "treasury": "0x3f833be7447f82e8654bc634981899db0ee8042e",
+    "jobStatus": "completed",
+    "jobStatusCode": 3,
+    "jobBudget": 0.1,
+    "escrowedAmount": 0.1,
+    "providerReleasedAmount": 0.09,
+    "evaluatorFeeAmount": 0.005,
+    "platformFeeAmount": 0.005,
+    "funding": {
+      "lifecycleEvent": "JobFunded",
+      "transactionHash": "0xe28f073db856502b6c18446d687db7eac361085c859082905614f728dd6b8348",
+      "blockNumber": 50799910,
+      "receiptStatus": 1,
+      "outerTransactionFrom": "0x2891d2f99bc447a591f06d896f5f72647aa1bc4c",
+      "outerTransactionTo": "0x0000000071727de22e5e9d8baf0edac6f37da032",
+      "explorerUrl": "https://basescan.org/tx/0xe28f073db856502b6c18446d687db7eac361085c859082905614f728dd6b8348"
+    },
+    "completion": {
+      "lifecycleEvent": "EvaluatorFeePaid + PaymentReleased + JobCompleted",
+      "transactionHash": "0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369",
+      "blockNumber": 50799914,
+      "receiptStatus": 1,
+      "outerTransactionFrom": "0x2891d2f99bc447a591f06d896f5f72647aa1bc4c",
+      "outerTransactionTo": "0x0000000071727de22e5e9d8baf0edac6f37da032",
+      "explorerUrl": "https://basescan.org/tx/0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369"
+    },
+    "lifecycleTransactions": [
+      {
+        "lifecycleEvent": "JobCreated",
+        "transactionHash": "0x380a343f19b5b224d7d5fc4b1054387c966e819b3a2792e499689bb4f37e0958",
+        "blockNumber": 50799906,
+        "receiptStatus": null,
+        "outerTransactionFrom": null,
+        "outerTransactionTo": null,
+        "explorerUrl": "https://basescan.org/tx/0x380a343f19b5b224d7d5fc4b1054387c966e819b3a2792e499689bb4f37e0958"
+      },
+      {
+        "lifecycleEvent": "BudgetSet",
+        "transactionHash": "0xd6e8f5bab164b5116b7bedb22c8c26b575b9fcd17ca508468b20bac3ddf33edd",
+        "blockNumber": 50799908,
+        "receiptStatus": null,
+        "outerTransactionFrom": null,
+        "outerTransactionTo": null,
+        "explorerUrl": "https://basescan.org/tx/0xd6e8f5bab164b5116b7bedb22c8c26b575b9fcd17ca508468b20bac3ddf33edd"
+      },
+      {
+        "lifecycleEvent": "JobFunded",
+        "transactionHash": "0xe28f073db856502b6c18446d687db7eac361085c859082905614f728dd6b8348",
+        "blockNumber": 50799910,
+        "receiptStatus": 1,
+        "outerTransactionFrom": "0x2891d2f99bc447a591f06d896f5f72647aa1bc4c",
+        "outerTransactionTo": "0x0000000071727de22e5e9d8baf0edac6f37da032",
+        "explorerUrl": "https://basescan.org/tx/0xe28f073db856502b6c18446d687db7eac361085c859082905614f728dd6b8348"
+      },
+      {
+        "lifecycleEvent": "JobSubmitted",
+        "transactionHash": "0x5eed16ac9d026c6f332cb70149114d929946927e6c9da4b9a9abbb2754fa2aeb",
+        "blockNumber": 50799912,
+        "receiptStatus": null,
+        "outerTransactionFrom": null,
+        "outerTransactionTo": null,
+        "explorerUrl": "https://basescan.org/tx/0x5eed16ac9d026c6f332cb70149114d929946927e6c9da4b9a9abbb2754fa2aeb"
+      },
+      {
+        "lifecycleEvent": "EvaluatorFeePaid + PaymentReleased + JobCompleted",
+        "transactionHash": "0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369",
+        "blockNumber": 50799914,
+        "receiptStatus": 1,
+        "outerTransactionFrom": "0x2891d2f99bc447a591f06d896f5f72647aa1bc4c",
+        "outerTransactionTo": "0x0000000071727de22e5e9d8baf0edac6f37da032",
+        "explorerUrl": "https://basescan.org/tx/0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369"
+      }
+    ],
+    "escrowTransfer": {
+      "purpose": "job escrow",
+      "transactionHash": "0xe28f073db856502b6c18446d687db7eac361085c859082905614f728dd6b8348",
+      "logIndex": 465,
+      "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "source": "0x6d0355d3f32789eed1099020209f5cb4f564761f",
+      "destination": "0x238e541bfefd82238730d00a2208e5497f1832e0",
+      "rawAmount": 100000,
+      "amount": 0.1,
+      "asset": "USDC"
+    },
+    "completionTransfers": [
+      {
+        "purpose": "provider release",
+        "transactionHash": "0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369",
+        "logIndex": 562,
+        "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "source": "0x238e541bfefd82238730d00a2208e5497f1832e0",
+        "destination": "0xad72f78ef0ef88aaab8a3c66aacd077396187f0a",
+        "rawAmount": 90000,
+        "amount": 0.09,
+        "asset": "USDC"
+      },
+      {
+        "purpose": "evaluator fee",
+        "transactionHash": "0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369",
+        "logIndex": 560,
+        "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "source": "0x238e541bfefd82238730d00a2208e5497f1832e0",
+        "destination": "0x6d0355d3f32789eed1099020209f5cb4f564761f",
+        "rawAmount": 5000,
+        "amount": 0.005,
+        "asset": "USDC"
+      },
+      {
+        "purpose": "platform fee",
+        "transactionHash": "0xec26b0a878c1cf3c5836861b6a659882ae0cace33aeeb69d8a559701882ce369",
+        "logIndex": 559,
+        "token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "source": "0x238e541bfefd82238730d00a2208e5497f1832e0",
+        "destination": "0x3f833be7447f82e8654bc634981899db0ee8042e",
+        "rawAmount": 5000,
+        "amount": 0.005,
+        "asset": "USDC"
+      }
+    ],
+    "contractJobUrl": "https://basescan.org/address/0x238e541bfefd82238730d00a2208e5497f1832e0#readProxyContract"
+  },
+  "statement": "The job budget and escrow were 0.1 USDC. The completion transaction released 0.09 USDC to the provider and split the remaining 0.01 USDC between evaluator and platform fees."
+}

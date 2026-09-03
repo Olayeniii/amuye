@@ -1,0 +1,462 @@
+{
+  "request": {
+    "objective": "Assess whether protocol controlled warrants deeper diligence before integration",
+    "maxBudget": 100,
+    "deadline": "2027-01-15T18:00:00Z",
+    "priority": "balanced",
+    "hardConstraints": [
+      "do not exceed budget",
+      "use only supplied protocol evidence",
+      "protocolSlug=controlled",
+      "security analysis is mandatory for this assessment"
+    ],
+    "clientId": "changed-constraint-proof",
+    "taskClass": "protocol_assessment"
+  },
+  "changedConstraint": "security analysis is mandatory for this assessment",
+  "recalledLessonId": "lesson_progressive_specialist_purchasing_v1",
+  "applicabilityAssessment": "Partially applicable: progressive sequencing remains relevant; the security continuation gate conflicts with mandatory security analysis and is overridden for this job.",
+  "conflictingMemoryRule": "Purchase security analysis only if risk evidence justifies it.",
+  "preservedMemoryDerivedRules": [
+    "Run viability/onchain analysis before risk synthesis.",
+    "Purchase risk synthesis only when viability evidence justifies continuation.",
+    "Pass accepted viability evidence into risk synthesis.",
+    "Run security analysis after risk synthesis with preceding context."
+  ],
+  "overriddenRule": "risk continueToSecurity must be true before security purchase",
+  "reasonForOverride": "Security continuation gate from Sibyl lesson lesson_progressive_specialist_purchasing_v1 overridden by hard client constraint: mandatory security analysis",
+  "overrideSource": "hard client constraint enforced by planner and ExecutionController",
+  "initialAdaptedGraph": [
+    {
+      "id": "node_b2b74e3287a4",
+      "jobId": "job_40a676cc00b7",
+      "type": "viability_onchain",
+      "description": "Collect protocol viability and onchain evidence",
+      "assignedProvider": "specialist-pool-viability_onchain",
+      "dependencies": [],
+      "estimatedCost": 10.0,
+      "actualCost": 0,
+      "status": "proposed",
+      "conditionalTrigger": null,
+      "inputRefs": [],
+      "outputRefs": [],
+      "evaluationStatus": "pending",
+      "createdAt": "2026-09-03T08:13:14.571778+00:00",
+      "startedAt": null,
+      "completedAt": null,
+      "mutationReason": "Applied Sibyl lesson lesson_progressive_specialist_purchasing_v1"
+    },
+    {
+      "id": "node_f38207c6c872",
+      "jobId": "job_40a676cc00b7",
+      "type": "risk_synthesis",
+      "description": "Synthesize material protocol risks",
+      "assignedProvider": "specialist-pool-risk_synthesis",
+      "dependencies": [
+        "node_b2b74e3287a4"
+      ],
+      "estimatedCost": 25.0,
+      "actualCost": 0,
+      "status": "proposed",
+      "conditionalTrigger": "viability evidence shows continued assessment is justified",
+      "inputRefs": [],
+      "outputRefs": [],
+      "evaluationStatus": "pending",
+      "createdAt": "2026-09-03T08:13:14.571791+00:00",
+      "startedAt": null,
+      "completedAt": null,
+      "mutationReason": "Made conditional by Sibyl lesson lesson_progressive_specialist_purchasing_v1"
+    },
+    {
+      "id": "node_3676fcf667c5",
+      "jobId": "job_40a676cc00b7",
+      "type": "security_analysis",
+      "description": "Perform deeper security analysis",
+      "assignedProvider": "specialist-pool-security_analysis",
+      "dependencies": [
+        "node_f38207c6c872"
+      ],
+      "estimatedCost": 60.0,
+      "actualCost": 0,
+      "status": "proposed",
+      "conditionalTrigger": null,
+      "inputRefs": [],
+      "outputRefs": [],
+      "evaluationStatus": "pending",
+      "createdAt": "2026-09-03T08:13:14.571796+00:00",
+      "startedAt": null,
+      "completedAt": null,
+      "mutationReason": "Security continuation gate from Sibyl lesson lesson_progressive_specialist_purchasing_v1 overridden by hard client constraint: mandatory security analysis"
+    }
+  ],
+  "finalGraph": [
+    {
+      "id": "node_b2b74e3287a4",
+      "jobId": "job_40a676cc00b7",
+      "type": "viability_onchain",
+      "description": "Collect protocol viability and onchain evidence",
+      "assignedProvider": "specialist-pool-viability_onchain",
+      "dependencies": [],
+      "estimatedCost": 10.0,
+      "actualCost": 10.0,
+      "status": "completed",
+      "conditionalTrigger": null,
+      "inputRefs": [],
+      "outputRefs": [
+        "evidence:node_b2b74e3287a4"
+      ],
+      "evaluationStatus": "passed",
+      "createdAt": "2026-09-03T08:13:14.571778+00:00",
+      "startedAt": "2026-09-03T08:13:14.571909+00:00",
+      "completedAt": "2026-09-03T08:13:14.572041+00:00",
+      "mutationReason": "specialist evidence received and accepted"
+    },
+    {
+      "id": "node_f38207c6c872",
+      "jobId": "job_40a676cc00b7",
+      "type": "risk_synthesis",
+      "description": "Synthesize material protocol risks",
+      "assignedProvider": "specialist-pool-risk_synthesis",
+      "dependencies": [
+        "node_b2b74e3287a4"
+      ],
+      "estimatedCost": 25.0,
+      "actualCost": 25.0,
+      "status": "completed",
+      "conditionalTrigger": "viability evidence shows continued assessment is justified",
+      "inputRefs": [
+        "evidence:node_b2b74e3287a4"
+      ],
+      "outputRefs": [
+        "evidence:node_f38207c6c872"
+      ],
+      "evaluationStatus": "passed",
+      "createdAt": "2026-09-03T08:13:14.571791+00:00",
+      "startedAt": "2026-09-03T08:13:14.572067+00:00",
+      "completedAt": "2026-09-03T08:13:14.572084+00:00",
+      "mutationReason": "specialist evidence received and accepted"
+    },
+    {
+      "id": "node_3676fcf667c5",
+      "jobId": "job_40a676cc00b7",
+      "type": "security_analysis",
+      "description": "Perform deeper security analysis",
+      "assignedProvider": "specialist-pool-security_analysis",
+      "dependencies": [
+        "node_f38207c6c872"
+      ],
+      "estimatedCost": 60.0,
+      "actualCost": 60.0,
+      "status": "completed",
+      "conditionalTrigger": null,
+      "inputRefs": [
+        "evidence:node_b2b74e3287a4",
+        "evidence:node_f38207c6c872"
+      ],
+      "outputRefs": [
+        "evidence:node_3676fcf667c5"
+      ],
+      "evaluationStatus": "passed",
+      "createdAt": "2026-09-03T08:13:14.571796+00:00",
+      "startedAt": "2026-09-03T08:13:14.572100+00:00",
+      "completedAt": "2026-09-03T08:13:14.572113+00:00",
+      "mutationReason": "specialist evidence received and accepted"
+    }
+  ],
+  "executionSequence": [
+    "viability_onchain",
+    "risk_synthesis",
+    "security_analysis"
+  ],
+  "purchases": [
+    {
+      "providerJobType": "local_specialist",
+      "providerId": "local-viability_onchain",
+      "role": "viability_onchain",
+      "cost": 10.0,
+      "nodeId": "node_b2b74e3287a4"
+    },
+    {
+      "providerJobType": "local_specialist",
+      "providerId": "local-risk_synthesis",
+      "role": "risk_synthesis",
+      "cost": 25.0,
+      "nodeId": "node_f38207c6c872"
+    },
+    {
+      "providerJobType": "local_specialist",
+      "providerId": "local-security_analysis",
+      "role": "security_analysis",
+      "cost": 60.0,
+      "nodeId": "node_3676fcf667c5"
+    }
+  ],
+  "spend": 95.0,
+  "remainingBudget": 5.0,
+  "finalResult": {
+    "status": "completed",
+    "evidence": [
+      {
+        "role": "viability_onchain",
+        "objectiveSatisfied": false,
+        "continueToRisk": true,
+        "gateReason": "Controlled Protocol has measurable activity and deployment evidence, so risk synthesis is justified.",
+        "protocol": {
+          "slug": "controlled",
+          "name": "Controlled Protocol",
+          "category": "DEX",
+          "url": "https://example.invalid/controlled"
+        },
+        "metrics": {
+          "currentTvlUsd": 50000000.0,
+          "chains": [
+            "Base"
+          ],
+          "chainCount": 1,
+          "change1dPct": 1.0,
+          "change7dPct": 2.0,
+          "auditCount": 2,
+          "auditLinks": [
+            "https://example.invalid/audit-1",
+            "https://example.invalid/audit-2"
+          ],
+          "marketCapUsd": 75000000.0
+        },
+        "evidence": [
+          {
+            "source": "defillama",
+            "field": "currentTvlUsd",
+            "value": 50000000.0
+          },
+          {
+            "source": "defillama",
+            "field": "chains",
+            "value": [
+              "Base"
+            ]
+          },
+          {
+            "source": "defillama",
+            "field": "audits",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "role": "risk_synthesis",
+        "objectiveSatisfied": false,
+        "continueToSecurity": false,
+        "gateReason": "No material combination of public risk signals justified security analysis.",
+        "identifiedRisks": [],
+        "evidence": [
+          {
+            "source": "viability_onchain",
+            "field": "metrics",
+            "value": {
+              "currentTvlUsd": 50000000.0,
+              "chains": [
+                "Base"
+              ],
+              "chainCount": 1,
+              "change1dPct": 1.0,
+              "change7dPct": 2.0,
+              "auditCount": 2,
+              "auditLinks": [
+                "https://example.invalid/audit-1",
+                "https://example.invalid/audit-2"
+              ],
+              "marketCapUsd": 75000000.0
+            }
+          },
+          {
+            "source": "viability_onchain",
+            "field": "protocol",
+            "value": {
+              "slug": "controlled",
+              "name": "Controlled Protocol",
+              "category": "DEX",
+              "url": "https://example.invalid/controlled"
+            }
+          }
+        ],
+        "consumedEvidenceRefs": [
+          "viability_onchain"
+        ]
+      },
+      {
+        "role": "security_analysis",
+        "objectiveSatisfied": true,
+        "assessment": "no_material_public_signal",
+        "findings": [
+          {
+            "check": "audit-coverage",
+            "status": "reported",
+            "severity": "info",
+            "detail": "Protocol data reports 2 audit record(s)."
+          }
+        ],
+        "evidence": [
+          {
+            "source": "viability_onchain",
+            "field": "auditLinks",
+            "value": [
+              "https://example.invalid/audit-1",
+              "https://example.invalid/audit-2"
+            ]
+          },
+          {
+            "source": "risk_synthesis",
+            "field": "identifiedRisks",
+            "value": []
+          }
+        ],
+        "consumedEvidenceRefs": [
+          "viability_onchain",
+          "risk_synthesis"
+        ]
+      }
+    ]
+  },
+  "mandatorySecurityEvidence": {
+    "riskContinueToSecurity": false,
+    "securityNodeStatus": "completed",
+    "securityOutput": {
+      "role": "security_analysis",
+      "objectiveSatisfied": true,
+      "assessment": "no_material_public_signal",
+      "findings": [
+        {
+          "check": "audit-coverage",
+          "status": "reported",
+          "severity": "info",
+          "detail": "Protocol data reports 2 audit record(s)."
+        }
+      ],
+      "evidence": [
+        {
+          "source": "viability_onchain",
+          "field": "auditLinks",
+          "value": [
+            "https://example.invalid/audit-1",
+            "https://example.invalid/audit-2"
+          ]
+        },
+        {
+          "source": "risk_synthesis",
+          "field": "identifiedRisks",
+          "value": []
+        }
+      ],
+      "consumedEvidenceRefs": [
+        "viability_onchain",
+        "risk_synthesis"
+      ]
+    },
+    "policyMutation": {
+      "sequence": 7,
+      "nodeId": "node_3676fcf667c5",
+      "mutation": "status_transition",
+      "fromStatus": "proposed",
+      "toStatus": "ready",
+      "reason": "security continuation gate overridden by hard client constraint: mandatory security analysis",
+      "createdAt": "2026-09-03T08:13:14.572096+00:00",
+      "relatedNodeId": null
+    }
+  },
+  "lessonIntegrity": {
+    "before": {
+      "id": "lesson_progressive_specialist_purchasing_v1",
+      "taskPattern": "protocol_assessment",
+      "strategy": "Purchase viability/onchain evidence first. Purchase risk synthesis only if viability evidence justifies continuation. Purchase security analysis only if risk evidence justifies it.",
+      "reasoning": "The baseline bought risk and security work before viability evidence was evaluated. Viability evidence already satisfied the objective, so 85 budget units were avoidable and deeper providers lacked prior context.",
+      "applicabilityConditions": [
+        "protocol assessment",
+        "security analysis is not mandatory at intake",
+        "viability evidence can inform continuation"
+      ],
+      "nonApplicabilityConditions": [
+        "hard constraint mandates immediate security analysis",
+        "task is not a protocol assessment"
+      ],
+      "supportingExecutionRefs": [
+        "7cc548a2-5740-42e4-a9be-1297a25a9b0d"
+      ],
+      "contradictoryEvidenceRefs": [],
+      "confidence": 0.86,
+      "status": "active",
+      "lastUpdatedAt": "2026-09-03T08:13:14.568033+00:00"
+    },
+    "after": {
+      "id": "lesson_progressive_specialist_purchasing_v1",
+      "taskPattern": "protocol_assessment",
+      "strategy": "Purchase viability/onchain evidence first. Purchase risk synthesis only if viability evidence justifies continuation. Purchase security analysis only if risk evidence justifies it.",
+      "reasoning": "The baseline bought risk and security work before viability evidence was evaluated. Viability evidence already satisfied the objective, so 85 budget units were avoidable and deeper providers lacked prior context.",
+      "applicabilityConditions": [
+        "protocol assessment",
+        "security analysis is not mandatory at intake",
+        "viability evidence can inform continuation"
+      ],
+      "nonApplicabilityConditions": [
+        "hard constraint mandates immediate security analysis",
+        "task is not a protocol assessment"
+      ],
+      "supportingExecutionRefs": [
+        "7cc548a2-5740-42e4-a9be-1297a25a9b0d"
+      ],
+      "contradictoryEvidenceRefs": [],
+      "confidence": 0.86,
+      "status": "active",
+      "lastUpdatedAt": "2026-09-03T08:13:14.568033+00:00"
+    },
+    "unchanged": true
+  },
+  "laterOrdinaryTask": {
+    "recalledLessonIds": [
+      "lesson_progressive_specialist_purchasing_v1"
+    ],
+    "securityConditionalTrigger": "risk evidence identifies material issues requiring deeper security analysis",
+    "securityStatus": "skipped",
+    "securitySkipReason": "risk evidence did not justify security analysis"
+  },
+  "environment": {
+    "model": "none, deterministic protocol-assessment specialists",
+    "pythonImplementation": "CPython",
+    "pythonVersion": "3.12.13",
+    "planner": "amuye.planner",
+    "providerPool": [
+      "ViabilityOnchainSpecialist",
+      "RiskSynthesisSpecialist",
+      "SecurityAnalysisSpecialist"
+    ],
+    "providerDataSource": "StaticProtocolDataSource",
+    "pricing": {
+      "viability_onchain": 10.0,
+      "risk_synthesis": 25.0,
+      "security_analysis": 60.0
+    },
+    "executionController": "ExecutionController",
+    "evaluationLogic": "validate_specialist_evidence and role-specific continuation gates",
+    "providerProfile": {
+      "name": "Controlled Protocol",
+      "category": "DEX",
+      "url": "https://example.invalid/controlled",
+      "tvl": [
+        {
+          "date": 1,
+          "totalLiquidityUSD": 50000000
+        }
+      ],
+      "chains": [
+        "Base"
+      ],
+      "audits": "2",
+      "audit_links": [
+        "https://example.invalid/audit-1",
+        "https://example.invalid/audit-2"
+      ],
+      "change_1d": 1.0,
+      "change_7d": 2.0,
+      "mcap": 75000000
+    }
+  }
+}

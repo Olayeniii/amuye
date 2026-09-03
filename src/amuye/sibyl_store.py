@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sibyl_memory_client import MemoryClient
+from sibyl_memory_client import MemoryClient, NotFoundError
 
 from .domain import LearnedLesson
 
@@ -18,16 +18,25 @@ class SibylStore:
         self.database_path = str(Path(database_path).resolve())
         self.client = MemoryClient.local(self.database_path)
 
-    def write_execution_history(self, execution: dict[str, Any]) -> str:
-        event_ref = execution["executionId"]
-        self.client.write_event(
-            evaluated={
+    def write_execution_history(
+        self,
+        execution: dict[str, Any],
+        *,
+        evaluation: dict[str, Any] | None = None,
+    ) -> str:
+        application_execution_id = execution["executionId"]
+        event_ref = self.client.write_event(
+            evaluated=evaluation or {
                 "outcome": execution["outcome"],
                 "finding": "later specialist purchases lacked prerequisite evidence and were unnecessary",
             },
             acted=["commissioned viability, risk synthesis, and security work up front"],
             forward=["purchase viability evidence before deeper specialist work"],
-            extra={"kind": "amuye_execution", "executionRef": event_ref, "execution": execution},
+            extra={
+                "kind": "amuye_execution",
+                "applicationExecutionId": application_execution_id,
+                "execution": execution,
+            },
         )
         return event_ref
 
@@ -43,3 +52,20 @@ class SibylStore:
                 continue
             lessons.append(LearnedLesson(**hit["body"]))
         return lessons
+
+    def get_lesson(self, lesson_id: str) -> LearnedLesson | None:
+        try:
+            entity = self.client.get_entity(LESSON_CATEGORY, lesson_id)
+        except NotFoundError:
+            return None
+        return LearnedLesson(**entity["body"])
+
+    def execution_event_exists(self, event_id: str) -> bool:
+        return any(event["id"] == event_id for event in self.client.read_events(limit=1000))
+
+    def get_execution_event(self, event_id: str) -> dict[str, Any] | None:
+        return next(
+            (event for event in self.client.read_events(limit=1000)
+             if event["id"] == event_id),
+            None,
+        )

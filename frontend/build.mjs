@@ -1,0 +1,142 @@
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+const root = resolve(import.meta.dirname, "..");
+const frontend = resolve(root, "frontend");
+const dist = resolve(root, "dist");
+
+const load = async (path) => JSON.parse(await readFile(resolve(root, path), "utf8"));
+const settlement = (await load("artifacts/checkpoint6/job-75660-settlement.json")).settlementProof;
+const comparison = await load("artifacts/checkpoint7/memory-off-vs-on.json");
+const adaptation = await load("artifacts/checkpoint8/mandatory-security-adaptation.json");
+const lesson = comparison.control.persistedLesson;
+
+function compactRun(key, label, run, overrides = {}) {
+  const evidence = run.execution.result.evidence;
+  const security = run.execution.finalGraph.find((node) => node.type === "security_analysis");
+  return {
+    key,
+    label,
+    eyebrow: overrides.eyebrow || "Controlled protocol assessment",
+    result: overrides.result || (security.status === "skipped"
+      ? "Assessment completed without deeper security work. Accepted risk evidence did not justify the purchase."
+      : "Assessment completed across viability, risk, and security specialists."),
+    verification: "Specialist output contracts passed validation",
+    request: run.request,
+    memory: {
+      enabled: run.memory.operationalMemoryAvailableToPlanner,
+      lessonId: run.memory.recalledLessonIds[0] || null,
+      applicability: run.memory.applicabilityDecision,
+      influencedRule: overrides.influencedRule || (run.memory.recalledLessonIds.length
+        ? "Security work is purchased only when accepted risk evidence justifies it."
+        : "No memory rule influenced this plan."),
+      adapted: overrides.adapted || false,
+      adaptationReason: overrides.adaptationReason || null,
+    },
+    graph: run.execution.finalGraph.map((node) => ({
+      id: node.id,
+      role: node.type,
+      status: node.status,
+      dependencies: node.dependencies,
+      gate: node.conditionalTrigger,
+      cost: node.actualCost,
+      reason: node.mutationReason,
+      verification: node.evaluationStatus,
+    })),
+    mutations: run.execution.mutations,
+    execution: {
+      purchased: run.execution.providerJobsPurchased,
+      order: run.execution.executionSequence,
+      spent: run.execution.spent,
+      remaining: run.execution.remainingBudget,
+      stoppedEarly: run.execution.stoppedEarly,
+      stopReason: run.execution.stopReason,
+    },
+    evidence,
+    learning: overrides.learning || {
+      reflection: run.memory.operationalMemoryAvailableToPlanner
+        ? "This controlled execution tested an existing lesson without changing it."
+        : "Cold execution showed that unconditional security purchasing can spend more than the evidence requires.",
+      decision: run.memory.operationalMemoryAvailableToPlanner ? "No lesson mutation in this run" : "Progressive purchasing lesson available from evaluated execution history",
+      lessonId: lesson.id,
+      evidenceRefs: lesson.supportingExecutionRefs,
+      confirmed: true,
+    },
+  };
+}
+
+const modeA = compactRun("memory-off", "Memory OFF", comparison.runA_memoryOff);
+const modeB = compactRun("memory-on", "Memory ON", comparison.runB_memoryOn);
+const changedRun = {
+  request: adaptation.request,
+  memory: {
+    operationalMemoryAvailableToPlanner: true,
+    recalledLessonIds: [adaptation.recalledLessonId],
+    applicabilityDecision: adaptation.applicabilityAssessment,
+  },
+  execution: {
+    result: adaptation.finalResult,
+    finalGraph: adaptation.finalGraph,
+    mutations: adaptation.mandatorySecurityEvidence.policyMutation
+      ? [adaptation.mandatorySecurityEvidence.policyMutation]
+      : [],
+    providerJobsPurchased: adaptation.purchases,
+    executionSequence: adaptation.executionSequence,
+    spent: adaptation.spend,
+    remainingBudget: adaptation.remainingBudget,
+    stoppedEarly: false,
+    stopReason: null,
+  },
+};
+const modeC = compactRun("mandatory-security", "Mandatory security", changedRun, {
+  eyebrow: "Changed client constraint",
+  result: "Mandatory security analysis completed even though risk evidence did not recommend deeper work.",
+  influencedRule: adaptation.overriddenRule,
+  adapted: true,
+  adaptationReason: adaptation.reasonForOverride,
+  learning: {
+    reflection: "The recalled lesson remained useful for ordering and the viability-to-risk gate. Its security gate conflicted with this job's authority rules.",
+    decision: "Job-local override only. The stored Sibyl lesson was not mutated.",
+    lessonId: adaptation.recalledLessonId,
+    evidenceRefs: lesson.supportingExecutionRefs,
+    confirmed: adaptation.lessonIntegrity.unchanged,
+  },
+});
+
+const payload = {
+  product: {
+    name: "Amúyẹ",
+    line: "Give Amúyẹ a job, budget, and deadline. It buys specialist work only as evidence requires, then carries the lesson into the next run.",
+  },
+  modes: [modeA, modeB, modeC],
+  partnerProof: {
+    jobId: settlement.jobId,
+    provider: settlement.provider,
+    offering: "riskSynthesis",
+    network: settlement.network,
+    chainId: settlement.chainId,
+    asset: "USDC",
+    escrow: settlement.escrowedAmount,
+    providerRelease: settlement.providerReleasedAmount,
+    evaluatorFee: settlement.evaluatorFeeAmount,
+    platformFee: settlement.platformFeeAmount,
+    funding: settlement.funding,
+    completion: settlement.completion,
+  },
+};
+
+if (payload.partnerProof.chainId !== 8453 || payload.partnerProof.jobId !== "75660") {
+  throw new Error("Expected Base proof for ACP job 75660");
+}
+if (payload.modes[0].execution.spent !== 95 || payload.modes[1].execution.spent !== 35) {
+  throw new Error("Controlled comparison artifact does not match expected proof");
+}
+
+await rm(dist, { recursive: true, force: true });
+await mkdir(resolve(dist, "assets"), { recursive: true });
+await cp(resolve(frontend, "index.html"), resolve(dist, "index.html"));
+await cp(resolve(frontend, "src", "app.js"), resolve(dist, "app.js"));
+await cp(resolve(frontend, "src", "styles.css"), resolve(dist, "styles.css"));
+await cp(resolve(frontend, "assets", "amuye-logo.png"), resolve(dist, "assets", "amuye-logo.png"));
+await writeFile(resolve(dist, "demo-data.json"), `${JSON.stringify(payload, null, 2)}\n`);
+console.log(`Built Amúyẹ execution console at ${dist}`);
