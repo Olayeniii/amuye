@@ -12,6 +12,26 @@ from .domain import JobRequest, new_id, utc_now
 from .live import run_live_assessment
 
 
+def live_acp_configuration() -> dict[str, Any]:
+    required = [
+        "ACP_BUYER_WALLET_ADDRESS", "ACP_BUYER_WALLET_ID",
+        "ACP_BUYER_SIGNER_PRIVATE_KEY", "ACP_RISK_PROVIDER_ADDRESS",
+        "ACP_RISK_OFFERING_NAME",
+    ]
+    missing = [name for name in required if not os.environ.get(name)]
+    return {
+        "enabled": not missing,
+        "provider": os.environ.get("ACP_RISK_PROVIDER_ADDRESS"),
+        "offering": os.environ.get("ACP_RISK_OFFERING_NAME", "riskSynthesis"),
+        "network": "Base mainnet",
+        "chainId": 8453,
+        "maxExpectedSpend": float(os.environ.get("ACP_RISK_MAX_EXPECTED_SPEND", "25")),
+        "asset": "USDC",
+        "notice": "This creates and funds a real paid Virtuals ACP job.",
+        "missingConfiguration": missing,
+    }
+
+
 class AssessmentService:
     def __init__(
         self,
@@ -19,20 +39,32 @@ class AssessmentService:
         *,
         runner: Callable[..., dict[str, Any]] = run_live_assessment,
         data_source: Any = None,
+        acp_client: Any = None,
+        settlement_capture: Any = None,
+        acp_config: dict[str, Any] | None = None,
     ) -> None:
         self.memory_db = Path(memory_db)
         self.runner = runner
         self.data_source = data_source
+        self.acp_client = acp_client
+        self.settlement_capture = settlement_capture
+        self.acp_config = acp_config or live_acp_configuration()
         self.jobs: dict[str, dict[str, Any]] = {}
         self.lock = threading.Lock()
 
-    def submit(self, request: dict[str, Any], *, memory_enabled: bool) -> str:
+    def submit(self, request: dict[str, Any], *, memory_enabled: bool,
+               provider_mode: str = "local", acp_confirmed: bool = False) -> str:
+        if provider_mode == "live_acp" and not acp_confirmed:
+            raise ValueError("live ACP execution requires explicit paid-job confirmation")
+        if provider_mode == "live_acp" and not self.acp_config["enabled"]:
+            raise ValueError("live ACP execution is not configured")
         api_job_id = new_id("api_job")
         with self.lock:
             self.jobs[api_job_id] = {
                 "id": api_job_id,
                 "status": "accepted",
                 "memoryEnabled": memory_enabled,
+                "providerMode": provider_mode,
                 "request": request,
                 "events": [{"type": "request_accepted", "at": utc_now()}],
                 "result": None,
@@ -40,12 +72,13 @@ class AssessmentService:
             }
         threading.Thread(
             target=self._run,
-            args=(api_job_id, request, memory_enabled),
+            args=(api_job_id, request, memory_enabled, provider_mode, acp_confirmed),
             daemon=True,
         ).start()
         return api_job_id
 
-    def _run(self, api_job_id: str, request: dict[str, Any], memory_enabled: bool) -> None:
+    def _run(self, api_job_id: str, request: dict[str, Any], memory_enabled: bool,
+             provider_mode: str, acp_confirmed: bool) -> None:
         def progress(event: dict[str, Any]) -> None:
             event.setdefault("at", utc_now())
             with self.lock:
@@ -59,6 +92,12 @@ class AssessmentService:
                 memory_db=self.memory_db,
                 data_source=self.data_source,
                 progress=progress,
+                provider_mode=provider_mode,
+                acp_confirmed=acp_confirmed,
+                acp_client=self.acp_client,
+                settlement_capture=self.settlement_capture,
+                acp_max_cost=(self.acp_config["maxExpectedSpend"]
+                              if provider_mode == "live_acp" else None),
             )
             with self.lock:
                 self.jobs[api_job_id]["status"] = result["status"]
@@ -101,18 +140,34 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
                 memory = parse_qs(parsed.query).get("memory", ["on"])[0].lower()
                 if memory not in {"on", "off"}:
                     raise ValueError("memory query parameter must be on or off")
-                api_job_id = service.submit(payload, memory_enabled=memory == "on")
+                query = parse_qs(parsed.query)
+                provider_mode = query.get("provider", ["local"])[0].lower()
+                if provider_mode not in {"local", "live_acp"}:
+                    raise ValueError("provider query parameter must be local or live_acp")
+                acp_confirmed = query.get("confirmAcp", ["false"])[0].lower() == "true"
+                api_job_id = service.submit(
+                    payload,
+                    memory_enabled=memory == "on",
+                    provider_mode=provider_mode,
+                    acp_confirmed=acp_confirmed,
+                )
                 self._json(202, {
                     "jobId": api_job_id,
                     "status": "accepted",
                     "statusUrl": f"/api/assessments/{api_job_id}",
-                    "providerMode": "local specialists, no ACP payment",
+                    "providerMode": (
+                        "live Virtuals ACP risk purchase on Base mainnet"
+                        if provider_mode == "live_acp" else "local specialists, no ACP payment"
+                    ),
                 })
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 self._json(400, {"error": str(exc)})
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/acp/config":
+                self._json(200, service.acp_config)
+                return
             if parsed.path.startswith("/api/assessments/"):
                 api_job_id = parsed.path.rsplit("/", 1)[-1]
                 job = service.get(api_job_id)
@@ -157,7 +212,8 @@ def main() -> None:
     service = AssessmentService(memory_db)
     server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(service, dist))
     print(f"Amúyẹ live console: http://localhost:{port}")
-    print("Live runs use local specialists. Real ACP purchasing is disabled.")
+    state = "enabled with explicit confirmation" if service.acp_config["enabled"] else "not configured"
+    print(f"Live ACP risk purchasing is {state}.")
     server.serve_forever()
 
 

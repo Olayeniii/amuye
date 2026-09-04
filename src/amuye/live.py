@@ -6,16 +6,19 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from .acp import AcpRiskAssessmentProvider, AcpRiskClient, NodeAcpRiskClient
 from .checkpoint import plan_in_fresh_session
-from .domain import JobRequest, LearnedLesson, ReflectionResult, new_id, utc_now
+from .domain import JobRequest, LearnedLesson, ProviderJob, ReflectionResult, new_id, utc_now
 from .execution import ExecutionController
 from .learning import evaluate_execution, learn_from_execution
 from .planner import baseline_plan
 from .sibyl_store import SibylStore
+from .settlement import JsonRpc, capture_settlement_proof
 from .specialists import ProtocolAssessmentProvider, ProtocolDataSource
 
 
 Progress = Callable[[dict[str, Any]], None]
+SettlementCapture = Callable[[ProviderJob], dict[str, Any]]
 LESSON_ID = "lesson_progressive_specialist_purchasing_v1"
 PROCESS_SESSION_ID = f"amuye-process-{os.getpid()}-{uuid4().hex[:8]}"
 
@@ -79,7 +82,16 @@ def run_live_assessment(
     memory_db: str | Path,
     data_source: ProtocolDataSource | None = None,
     progress: Progress | None = None,
+    provider_mode: str = "local",
+    acp_confirmed: bool = False,
+    acp_client: AcpRiskClient | None = None,
+    settlement_capture: SettlementCapture | None = None,
+    acp_max_cost: float | None = None,
 ) -> dict[str, Any]:
+    if provider_mode not in {"local", "live_acp"}:
+        raise ValueError("provider_mode must be local or live_acp")
+    if provider_mode == "live_acp" and not acp_confirmed:
+        raise ValueError("live ACP execution requires explicit paid-job confirmation")
     request = JobRequest.from_dict(request_value)
     store = SibylStore(memory_db)
     _emit(progress, "intake_accepted", taskClass=request.taskClass)
@@ -104,7 +116,16 @@ def run_live_assessment(
         graph=strategy.to_dict()["orderedSteps"],
     )
 
-    provider = ProtocolAssessmentProvider(data_source)
+    local_provider = ProtocolAssessmentProvider(data_source)
+    provider = (
+        AcpRiskAssessmentProvider(
+            acp_client or NodeAcpRiskClient(),
+            local_provider,
+            event_callback=progress,
+            max_purchase_cost=acp_max_cost,
+        )
+        if provider_mode == "live_acp" else local_provider
+    )
     controller = ExecutionController(
         request,
         strategy,
@@ -112,6 +133,23 @@ def run_live_assessment(
         event_callback=progress,
     )
     result = controller.run()
+    settlement_proofs: list[dict[str, Any]] = []
+    if provider_mode == "live_acp":
+        capture = settlement_capture or _capture_live_settlement
+        for value in result.providerJobs:
+            if value["status"] != "completed" or not value.get("acpJobId"):
+                continue
+            provider_job = ProviderJob(**value)
+            proof = capture(provider_job)
+            settlement_proofs.append(proof)
+            _emit(
+                progress,
+                "settlement_verified",
+                acpJobId=provider_job.acpJobId,
+                network=proof["network"],
+                fundingTransactionHash=proof["funding"]["transactionHash"],
+                completionTransactionHash=proof["completion"]["transactionHash"],
+            )
     execution_id = new_id("execution")
     outputs = list(result.outputs.values())
     risk = next((item for item in outputs if item.get("role") == "risk_synthesis"), None)
@@ -203,7 +241,11 @@ def run_live_assessment(
         "evaluation": evaluation.to_dict(),
         "reflection": reflection.to_dict(),
         "lessonUpdate": lesson_update,
-        "providerMode": "local specialists, no ACP payment",
+        "providerMode": (
+            "live Virtuals ACP risk purchase on Base mainnet"
+            if provider_mode == "live_acp" else "local specialists, no ACP payment"
+        ),
+        "settlementProofs": settlement_proofs,
         "finalResult": {
             "status": result.status,
             "decision": "Assessment complete. Review accepted evidence and procurement decisions.",
@@ -213,3 +255,19 @@ def run_live_assessment(
     }
     _emit(progress, "execution_completed", result=response)
     return response
+
+
+def _capture_live_settlement(provider_job: ProviderJob) -> dict[str, Any]:
+    rpc = JsonRpc(os.environ.get("BASE_RPC_URL", "https://mainnet.base.org"))
+    latest_block = int(rpc.call("eth_blockNumber", []), 16)
+    lookback = int(os.environ.get("ACP_SETTLEMENT_BLOCK_LOOKBACK", "5000"))
+    proof = capture_settlement_proof(
+        int(provider_job.acpJobId),
+        rpc,
+        from_block=max(0, latest_block - lookback),
+        to_block=latest_block,
+        expected_buyer=os.environ.get("ACP_BUYER_WALLET_ADDRESS"),
+        expected_provider=provider_job.providerId,
+        expected_budget_raw=round(provider_job.quotedCost * 1_000_000),
+    )
+    return proof.to_dict()

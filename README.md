@@ -170,7 +170,9 @@ npm run console
 
 Open `http://localhost:4173`. In Codespaces, open port `4173` from the Ports panel.
 
-Live UI runs use local protocol specialists and cannot spend ACP funds. Set `AMUYE_MEMORY_DB` to choose the Sibyl database. The default is `artifacts/live/sibyl.db`.
+New assessments use local protocol specialists by default and cannot spend ACP funds. Selecting `Live ACP risk purchase` switches only risk synthesis to the registered Virtuals ACP provider. Before submission, the console displays the provider, `riskSynthesis` offering, Base mainnet, and the configured maximum expected USDC spend, then requires explicit confirmation. Viability and security remain local. If viability stops the run, no ACP job is created. A completed ACP job is followed by live Base receipt verification and its settlement links appear in the result.
+
+Set `AMUYE_MEMORY_DB` to choose the Sibyl database. The default is `artifacts/live/sibyl.db`. Live ACP mode also requires the buyer and provider values in `.env.example`; `ACP_RISK_MAX_EXPECTED_SPEND` is the hard maximum passed to the ACP buyer after confirmation.
 
 For a live source demonstration, run the same assessment first with memory disabled, then submit it again with memory enabled. The first execution writes evaluated experience to the Sibyl database. The second reads it during planning. Open `View Sibyl source` on the second result to show the exact planning-time record, database source, process identifier, applicability decision, and rule applied. The footer shows the source commit and console build time throughout the recording.
 
@@ -202,6 +204,16 @@ The response is `202 Accepted` with a `jobId` and `statusUrl`:
 ```
 
 Poll `GET /api/assessments/{jobId}`. It returns current status, ordered execution events, and, once complete, the strategy, graph, purchases, evidence, spend, evaluation, reflection, Sibyl references, and final result. `memory=off` disables operational-memory retrieval for a controlled cold run. It does not change provider behavior or policy enforcement.
+
+Programmatic live ACP submission uses the same request body and requires both explicit query values:
+
+```bash
+curl -X POST 'http://localhost:4173/api/assessments?memory=on&provider=live_acp&confirmAcp=true' \
+  -H 'Content-Type: application/json' \
+  --data @assessment.json
+```
+
+Safe provider, network, and maximum-spend confirmation data is available from `GET /api/acp/config`. No signer or wallet credentials are returned. Omitting `confirmAcp=true` rejects a live ACP request before execution. Local mode remains `provider=local` and never invokes the ACP client or settlement verifier.
 
 ## Tests
 

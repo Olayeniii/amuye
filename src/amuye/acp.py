@@ -5,7 +5,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .domain import JobRequest, ProviderJob, TaskNode, new_id, utc_now
 from .execution import SpecialistEvidence
@@ -114,9 +114,13 @@ class AcpRiskAssessmentProvider:
     """Local viability/security with risk synthesis purchased over ACP v2."""
 
     def __init__(self, acp_client: AcpRiskClient,
-                 local_provider: ProtocolAssessmentProvider | None = None) -> None:
+                 local_provider: ProtocolAssessmentProvider | None = None,
+                 event_callback: Callable[[dict[str, Any]], None] | None = None,
+                 max_purchase_cost: float | None = None) -> None:
         self.acp_client = acp_client
         self.local = local_provider or ProtocolAssessmentProvider()
+        self.event_callback = event_callback
+        self.max_purchase_cost = max_purchase_cost
         self.calls: list[str] = []
         self.contexts: list[dict[str, dict[str, Any]]] = []
 
@@ -164,8 +168,17 @@ class AcpRiskAssessmentProvider:
                 ],
             },
         }
+        authorized_cost = min(remaining_budget, self.max_purchase_cost or remaining_budget)
+        if self.event_callback is not None:
+            self.event_callback({
+                "type": "acp_purchase_started",
+                "provider": os.environ.get("ACP_RISK_PROVIDER_ADDRESS", "configured ACP provider"),
+                "offering": os.environ.get("ACP_RISK_OFFERING_NAME", "riskSynthesis"),
+                "network": "Base mainnet",
+                "maxCost": authorized_cost,
+            })
         try:
-            result = self.acp_client.purchase_risk(requirement, remaining_budget)
+            result = self.acp_client.purchase_risk(requirement, authorized_cost)
         except AcpPurchaseError as exc:
             provider_job = self._provider_job(node, exc.result) if exc.result else None
             return SpecialistEvidence(
@@ -175,6 +188,16 @@ class AcpRiskAssessmentProvider:
                 providerId=exc.result.provider_id if exc.result else "virtuals-acp",
                 providerJob=provider_job,
             )
+        if self.event_callback is not None:
+            self.event_callback({
+                "type": "acp_job_completed",
+                "acpJobId": result.acp_job_id,
+                "provider": result.provider_id,
+                "quotedCost": result.quoted_cost,
+                "settledCost": result.settled_cost,
+                "status": result.status,
+                "deliverableRef": result.deliverable_ref,
+            })
         return SpecialistEvidence(
             status="completed",
             findings=result.deliverable,

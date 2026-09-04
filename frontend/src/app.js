@@ -141,13 +141,32 @@ function modePage(mode) {
           <div class="ref"><span>Evidence event</span><code>${safe(mode.learning.evidenceRefs.join(", "))}</code></div>
         </section>
       </div>
+      ${liveAcpPanel(mode)}
     </main>`;
+}
+
+function liveAcpPanel(mode) {
+  if (!mode.acp || mode.acp.providerMode !== "live Virtuals ACP risk purchase on Base mainnet") return "";
+  const jobs = mode.acp.providerJobs || [];
+  const proofs = mode.acp.settlementProofs || [];
+  return `<section class="panel live-acp-panel">
+    <div class="section-head"><div><p class="eyebrow">Paid specialist procurement</p><h2>Virtuals ACP on Base</h2></div><span>${jobs.length ? "VERIFIED LIVE RUN" : "NO ACP JOB CREATED"}</span></div>
+    ${jobs.length ? jobs.map((job) => {
+      const proof = proofs.find((item) => String(item.jobId) === String(job.acpJobId));
+      return `<div class="acp-job">
+        <div class="proof-grid"><div><span>ACP job</span><strong>${safe(job.acpJobId)}</strong></div><div><span>Provider</span><strong title="${safe(job.providerId)}">${safe(shortAddress(job.providerId))}</strong></div><div><span>Offering</span><strong>riskSynthesis</strong></div><div><span>Quote</span><strong>${money(job.quotedCost)} USDC</strong></div><div><span>Recorded cost</span><strong>${money(job.settledCost)} USDC</strong></div><div><span>Status</span><strong>${safe(job.status)}</strong></div></div>
+        <div class="ref"><span>Deliverable</span><code>${safe(job.deliverableRef || "Not available")}</code></div>
+        <div class="ref"><span>Evaluation</span><code>${safe(job.evaluationRef || "Not available")}</code></div>
+        ${proof ? `<div class="transactions"><a href="${safe(proof.funding.explorerUrl)}" target="_blank" rel="noreferrer"><span>Funding · ${money(proof.escrowedAmount)} USDC escrow</span><code>${safe(proof.funding.transactionHash)}</code><b>View on BaseScan ↗</b></a><a href="${safe(proof.completion.explorerUrl)}" target="_blank" rel="noreferrer"><span>Completion · ${money(proof.providerReleasedAmount)} USDC provider release</span><code>${safe(proof.completion.transactionHash)}</code><b>View on BaseScan ↗</b></a></div><p class="accounting">Verified on ${safe(proof.network)}: ${money(proof.escrowedAmount)} USDC escrowed, ${money(proof.providerReleasedAmount)} USDC released to the provider, ${money(proof.evaluatorFeeAmount)} USDC evaluator fee, and ${money(proof.platformFeeAmount)} USDC platform fee.</p>` : `<p class="accounting">No settlement proof was attached.</p>`}
+      </div>`;
+    }).join("") : `<p class="accounting">The viability gate ended this run before risk synthesis, so no paid ACP job was created.</p>`}
+  </section>`;
 }
 
 function newAssessmentPage() {
   const defaultDeadline = new Date(Date.now() + 86400000).toISOString().slice(0, 16);
   return `<main>
-    <section class="result-hero form-hero"><div><p class="eyebrow">Live procurement run</p><h1>Commission a protocol assessment</h1><p class="verified">Amúyẹ owns planning, specialist selection, gates, evaluation, and learning.</p></div><div class="safety-note"><strong>No paid ACP jobs</strong><span>Live UI runs use the local specialist path. Job 75660 remains historical proof.</span></div></section>
+    <section class="result-hero form-hero"><div><p class="eyebrow">Live procurement run</p><h1>Commission a protocol assessment</h1><p class="verified">Amúyẹ owns planning, specialist selection, gates, evaluation, and learning.</p></div><div class="safety-note"><strong>Local mode by default</strong><span>A real paid ACP job requires selecting Live ACP and confirming its purchase notice.</span></div></section>
     <form id="assessment-form" class="panel assessment-form">
       <label class="wide"><span>Objective</span><textarea name="objective" required>Assess protocol Aave for integration viability and material risks</textarea></label>
       <label><span>Maximum budget, units</span><input name="maxBudget" type="number" min="1" step="0.1" value="100" required></label>
@@ -156,19 +175,20 @@ function newAssessmentPage() {
       <label><span>Client ID</span><input name="clientId" value="ui-demo-client" required></label>
       <label class="wide"><span>Hard constraints, one per line</span><textarea name="hardConstraints" required>protocolSlug=aave</textarea><small>Example: protocolSlug=aave. Add "security analysis is mandatory" to enforce security.</small></label>
       <label class="memory-choice"><input name="memoryEnabled" type="checkbox" checked><span>Use Sibyl operational memory</span></label>
+      <label class="memory-choice live-acp-choice"><input name="liveAcpEnabled" type="checkbox"><span>Live ACP risk purchase</span><small>Uses Base mainnet and can spend real USDC. You will see a confirmation before submission.</small></label>
       <div class="form-actions"><button type="submit">Run assessment</button><span>Task class: protocol_assessment</span></div>
     </form>
   </main>`;
 }
 
 function eventLabel(event) {
-  return ({ request_accepted: "Request accepted", intake_accepted: "Intake validated", memory_retrieval_started: "Sibyl retrieval", plan_created: "Plan created", graph_mutation: "Graph updated", specialist_purchase: `Purchased ${labels[event.role] || event.role}`, evidence_accepted: `Accepted ${labels[event.role] || event.role} evidence`, evaluation_completed: "Execution evaluated", reflection_completed: "Reflection completed", lesson_updated: "Sibyl lesson updated", execution_completed: "Result ready", execution_failed: "Execution failed" })[event.type] || event.type;
+  return ({ request_accepted: "Request accepted", intake_accepted: "Intake validated", memory_retrieval_started: "Sibyl retrieval", plan_created: "Plan created", graph_mutation: "Graph updated", specialist_purchase: `Purchased ${labels[event.role] || event.role}`, acp_purchase_started: "Virtuals ACP purchase started", acp_job_completed: `ACP job ${event.acpJobId} completed`, settlement_verified: `Base settlement verified for ACP job ${event.acpJobId}`, evidence_accepted: `Accepted ${labels[event.role] || event.role} evidence`, evaluation_completed: "Execution evaluated", reflection_completed: "Reflection completed", lesson_updated: "Sibyl lesson updated", execution_completed: "Result ready", execution_failed: "Execution failed" })[event.type] || event.type;
 }
 
 function liveProgressPage(job) {
   const result = job.result;
   if (result) return modePage(liveResultToMode(result));
-  return `<main><section class="result-hero"><div><p class="eyebrow">Live run</p><h1>${job.error ? "Assessment failed" : "Amúyẹ is executing the assessment"}</h1><p class="verified"><i>${job.error ? "×" : "•"}</i>${safe(job.error || "Polling real backend state")}</p></div><div class="spend-orb"><small>Status</small><strong class="status-word">${safe(job.status)}</strong><span>local specialists</span></div></section>
+  return `<main><section class="result-hero"><div><p class="eyebrow">Live run</p><h1>${job.error ? "Assessment failed" : "Amúyẹ is executing the assessment"}</h1><p class="verified"><i>${job.error ? "×" : "•"}</i>${safe(job.error || "Polling real backend state")}</p></div><div class="spend-orb"><small>Status</small><strong class="status-word">${safe(job.status)}</strong><span>${job.providerMode === "live_acp" ? "Live ACP" : "Local specialists"}</span></div></section>
     ${job.request ? jobSummary({ request: job.request }) : ""}
     <section class="panel timeline-panel"><div class="section-head"><div><p class="eyebrow">Backend events</p><h2>Live execution</h2></div><span>${job.events.length} events</span></div><div class="timeline">${job.events.map((event) => `<div><i></i><strong>${safe(eventLabel(event))}</strong><span>${safe(new Date(event.at).toLocaleTimeString())}</span>${event.reason ? `<small>${safe(event.reason)}</small>` : ""}</div>`).join("")}</div></section></main>`;
 }
@@ -188,6 +208,7 @@ function liveResultToMode(result) {
     execution: { purchased: result.execution.purchasedRoles.map((role) => ({ role })), order: result.execution.purchasedRoles, spent: result.execution.spent, remaining: result.execution.remainingBudget, stoppedEarly: result.execution.stoppedEarly, stopReason: result.execution.stopReason },
     evidence: outputs,
     learning: { reflection: [...result.reflection.successfulDecisions, ...result.reflection.failedDecisions].join(" ") || "Execution evaluated before reflection.", decision: result.lessonUpdate ? `${result.lessonUpdate.action} ${result.lessonUpdate.lesson.id}` : "Execution recorded, no lesson mutation required", lessonId: result.lessonUpdate?.lesson?.id || recalled[0] || "None", evidenceRefs: result.reflection.evidenceRefs, confirmed: true },
+    acp: { providerMode: result.providerMode, providerJobs: result.execution.providerJobs, settlementProofs: result.settlementProofs },
   };
 }
 
@@ -225,10 +246,27 @@ function render() {
     event.currentTarget.querySelector("button").disabled = true;
     try {
       const memory = form.get("memoryEnabled") ? "on" : "off";
-      const response = await fetch(`/api/assessments?memory=${memory}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+      const liveAcp = Boolean(form.get("liveAcpEnabled"));
+      let providerQuery = "provider=local";
+      if (liveAcp) {
+        const configResponse = await fetch("/api/acp/config");
+        const config = await configResponse.json();
+        if (!configResponse.ok || !config.enabled) throw new Error(`Live ACP is not configured${config.missingConfiguration?.length ? `: ${config.missingConfiguration.join(", ")}` : ""}`);
+        const approved = confirm([
+          "Create a real paid Virtuals ACP job?",
+          `Provider: ${config.provider}`,
+          `Offering: ${config.offering}`,
+          `Network: ${config.network}`,
+          `Maximum expected spend: ${money(config.maxExpectedSpend)} ${config.asset}`,
+          config.notice,
+        ].join("\n"));
+        if (!approved) throw new Error("Live ACP purchase was not confirmed.");
+        providerQuery = "provider=live_acp&confirmAcp=true";
+      }
+      const response = await fetch(`/api/assessments?memory=${memory}&${providerQuery}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
       const accepted = await response.json();
       if (!response.ok) throw new Error(accepted.error || "Assessment was rejected");
-      liveJob = { id: accepted.jobId, status: accepted.status, request, events: [], result: null, error: null };
+      liveJob = { id: accepted.jobId, status: accepted.status, providerMode: liveAcp ? "live_acp" : "local", request, events: [], result: null, error: null };
       location.hash = "live-run";
       pollJob(accepted.statusUrl);
     } catch (error) {
