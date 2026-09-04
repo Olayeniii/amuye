@@ -118,6 +118,7 @@ function modePage(mode) {
             <h2>${mode.memory.enabled ? "Experience applied" : "Cold strategy"}</h2>
             <dl class="stacked-list">
               <div><dt>Recalled lesson</dt><dd>${safe(mode.memory.lessonId || "None")}</dd></div>
+              ${mode.memory.freshProcessId ? `<div><dt>Fresh process</dt><dd>${safe(mode.memory.freshProcessId)}</dd></div>` : ""}
               <div><dt>Applicability</dt><dd>${safe(mode.memory.applicability)}</dd></div>
               <div><dt>Rule influenced</dt><dd>${safe(mode.memory.influencedRule)}</dd></div>
               <div><dt>Adapted for constraints</dt><dd>${mode.memory.adapted ? "Yes" : "No"}${mode.memory.adaptationReason ? `<small>${safe(mode.memory.adaptationReason)}</small>` : ""}</dd></div>
@@ -215,7 +216,7 @@ function render() {
   const mode = data.modes.find((item) => item.key === route) || data.modes[1];
   const content = route === "new-assessment" ? newAssessmentPage() : route === "live-run" ? (liveJob ? liveProgressPage(liveJob) : newAssessmentPage()) : route === "partner-proof" ? proofPage() : modePage(mode);
   const evidenceRoute = data.modes.some((item) => item.key === route) || route === "partner-proof";
-  app.innerHTML = `<header><a class="brand" href="#memory-on"><img src="./assets/amuye-logo.png" alt="Amúyẹ"/><span><strong>Amúyẹ</strong><small>Procurement intelligence</small></span></a><nav><a class="new-action ${route === "new-assessment" || route === "live-run" ? "active" : ""}" href="#new-assessment">New Assessment</a>${data.modes.map((item) => `<a class="${route === item.key ? "active" : ""}" href="#${item.key}">${safe(item.label)}</a>`).join("")}<a class="${route === "partner-proof" ? "active" : ""}" href="#partner-proof">Partner proof</a></nav><span class="live"><i></i>${evidenceRoute ? "Reproducible proof" : "Live backend"}</span></header>${content}<footer><span>Amúyẹ</span><p>Procurement decisions shaped by execution evidence.</p></footer>`;
+  app.innerHTML = `<header><a class="brand" href="#memory-on"><img src="./assets/amuye-logo.png" alt="Amúyẹ"/><span><strong>Amúyẹ</strong><small>Procurement intelligence</small></span></a><nav><a class="new-action ${route === "new-assessment" || route === "live-run" ? "active" : ""}" href="#new-assessment">New Assessment</a>${data.modes.map((item) => `<a class="${route === item.key ? "active" : ""}" href="#${item.key}">${safe(item.label)}</a>`).join("")}<a class="${route === "partner-proof" ? "active" : ""}" href="#partner-proof">Partner proof</a></nav><span class="live"><i></i>${evidenceRoute ? "Reproducible proof" : "Live backend"}</span></header>${content}<footer><span>Amúyẹ</span><p>Procurement decisions shaped by execution evidence.</p><code title="${safe(data.buildEvidence.commitHash)}">commit ${safe(data.buildEvidence.commitHash.slice(0, 7))} · built ${safe(new Date(data.buildEvidence.builtAt).toISOString().slice(0, 16).replace("T", " "))} UTC</code></footer>`;
 
   document.querySelector("#assessment-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();

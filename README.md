@@ -20,7 +20,9 @@ Viability and security use the local specialist runtime. Risk synthesis can use 
 
 ## Why Sibyl is load-bearing
 
-The core product value is not simple routing. Amúyẹ learns how specialist work should be purchased, ordered, checked, and stopped.
+Amúyẹ learns how to procure specialist agent work from previous executions and applies that experience in later sessions. The core product value is not simple routing.
+
+Removing Sibyl does not prevent a basic protocol assessment. It removes persistent learned procurement behavior. A fresh session can no longer recall prior execution lessons and falls back to the cold baseline plan.
 
 The official `sibyl-memory-client` stores execution journal events and current operational lessons. A separate process can retrieve a lesson, assess its applicability, reference its ID in the plan, and change a real purchase. Amúyẹ does not maintain a second operational-memory database.
 
@@ -34,6 +36,20 @@ The official `sibyl-memory-client` stores execution journal events and current o
 - Lesson mutation flow: `learn_from_execution()` in `src/amuye/learning.py`
 
 `write_execution_history()` returns the real Sibyl journal-event ID. Supporting and contradictory lesson references use those journal IDs while Amúyẹ execution IDs remain in the event metadata.
+
+### Critical Sibyl SDK calls
+
+Judges can verify the full memory boundary in `src/amuye/sibyl_store.py`:
+
+| Operation | Function | Official client call |
+| --- | --- | --- |
+| Open the Sibyl-managed local store | `SibylStore.__init__()` | `MemoryClient.local(...)` |
+| Read lessons before planning | `SibylStore.retrieve_lessons()` | `client.search_entities(...)` |
+| Read one current lesson | `SibylStore.get_lesson()` | `client.get_entity(...)` |
+| Write execution evidence | `SibylStore.write_execution_history()` | `client.write_event(...)` |
+| Write or update a lesson | `SibylStore.write_lesson()` | `client.set_entity(...)` |
+
+`plan_in_fresh_session()` in `src/amuye/checkpoint.py` calls `retrieve_lessons()` and passes those returned records directly into `plan_with_memory()` in `src/amuye/planner.py`. Live runs preserve that planning-time record in the `View Sibyl source` panel before evaluation or reflection can update it.
 
 ## Fresh-session and controlled memory proof
 
@@ -51,6 +67,8 @@ The controlled comparison uses the same request, provider profile, prices, contr
 | B | ON | viability, risk | 35 |
 
 Risk evidence returns `continueToSecurity: false`. Run B skips the security purchase and traces that action to the recalled Sibyl lesson ID.
+
+The console exposes Memory OFF and Memory ON as adjacent proof modes. Each shows its distinct fresh-process identifier, graph, purchases, and spend, so both runs can be shown in one continuous recording segment without restarting or editing the video.
 
 ```bash
 .venv/bin/python -m amuye.demo_memory_control \
@@ -154,6 +172,8 @@ Open `http://localhost:4173`. In Codespaces, open port `4173` from the Ports pan
 
 Live UI runs use local protocol specialists and cannot spend ACP funds. Set `AMUYE_MEMORY_DB` to choose the Sibyl database. The default is `artifacts/live/sibyl.db`.
 
+For a live source demonstration, run the same assessment first with memory disabled, then submit it again with memory enabled. The first execution writes evaluated experience to the Sibyl database. The second reads it during planning. Open `View Sibyl source` on the second result to show the exact planning-time record, database source, process identifier, applicability decision, and rule applied. The footer shows the source commit and console build time throughout the recording.
+
 Another agent or client can submit the same request contract without the frontend:
 
 ```bash
@@ -192,3 +212,11 @@ npm run build
 ```
 
 Python tests use deterministic providers and mocked Base RPC responses. CI does not need Virtuals or Base network access.
+
+## Prior Work declaration
+
+Amúyẹ was implemented during this hackathon build window. The repository history begins on September 2, 2026 with the initial Sibyl-backed planning proof, followed by the execution controller, specialist behavior, Virtuals ACP integration, Base settlement verification, controlled memory tests, and judge console. No earlier Amúyẹ application codebase was imported into this repository. Third-party Sibyl, Virtuals ACP, Base, and public protocol-data services are credited dependencies rather than prior Amúyẹ work.
+
+## License and submission
+
+Amúyẹ is released under the OSI-approved [MIT License](LICENSE). The public-post and final-access checks that must be completed manually are listed in [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md). No user, traction, revenue, or testimonial claims are made without public evidence.

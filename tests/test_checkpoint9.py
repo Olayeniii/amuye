@@ -16,10 +16,20 @@ def built_payload() -> dict:
 
 def test_console_build_contains_three_required_demo_modes() -> None:
     payload = built_payload()
+    expected_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    assert payload["buildEvidence"]["commitHash"] == expected_commit
+    assert payload["buildEvidence"]["builtAt"].endswith("Z")
     modes = {mode["key"]: mode for mode in payload["modes"]}
     assert set(modes) == {"memory-off", "memory-on", "mandatory-security"}
     assert modes["memory-off"]["execution"]["spent"] == 95.0
     assert modes["memory-on"]["execution"]["spent"] == 35.0
+    assert modes["memory-off"]["memory"]["freshProcessId"]
+    assert modes["memory-on"]["memory"]["freshProcessId"]
+    assert (modes["memory-off"]["memory"]["freshProcessId"]
+            != modes["memory-on"]["memory"]["freshProcessId"])
     assert [item["role"] for item in modes["memory-on"]["execution"]["purchased"]] == [
         "viability_onchain", "risk_synthesis",
     ]

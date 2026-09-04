@@ -1,15 +1,20 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 
 const root = resolve(import.meta.dirname, "..");
 const frontend = resolve(root, "frontend");
 const dist = resolve(root, "dist");
+const execFileAsync = promisify(execFile);
 
 const load = async (path) => JSON.parse(await readFile(resolve(root, path), "utf8"));
 const settlement = (await load("artifacts/checkpoint6/job-75660-settlement.json")).settlementProof;
 const comparison = await load("artifacts/checkpoint7/memory-off-vs-on.json");
 const adaptation = await load("artifacts/checkpoint8/mandatory-security-adaptation.json");
 const lesson = comparison.control.persistedLesson;
+const { stdout: commitOutput } = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: root });
+const commitHash = commitOutput.trim();
 
 function compactRun(key, label, run, overrides = {}) {
   const evidence = run.execution.result.evidence;
@@ -25,6 +30,7 @@ function compactRun(key, label, run, overrides = {}) {
     request: run.request,
     memory: {
       enabled: run.memory.operationalMemoryAvailableToPlanner,
+      freshProcessId: run.freshProcessId,
       lessonId: run.memory.recalledLessonIds[0] || null,
       applicability: run.memory.applicabilityDecision,
       influencedRule: overrides.influencedRule || (run.memory.recalledLessonIds.length
@@ -104,6 +110,10 @@ const modeC = compactRun("mandatory-security", "Mandatory security", changedRun,
 });
 
 const payload = {
+  buildEvidence: {
+    commitHash,
+    builtAt: new Date().toISOString(),
+  },
   product: {
     name: "Amúyẹ",
     line: "Give Amúyẹ a job, budget, and deadline. It buys specialist work only as evidence requires, then carries the lesson into the next run.",
