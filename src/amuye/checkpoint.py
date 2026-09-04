@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 from .domain import JobRequest, LearnedLesson, ReflectionResult, new_id, utc_now
 from .planner import baseline_plan, plan_with_memory
+from .objective import resolve_objective_intent
 from .sibyl_store import SibylStore
 
 
@@ -63,6 +64,10 @@ def execute_baseline(request: JobRequest, store: SibylStore) -> tuple[dict, Refl
 
 
 def plan_in_fresh_session(request: JobRequest, store: SibylStore):
+    objective_intent = resolve_objective_intent(request)
+    # Classification deliberately precedes the read. Keep the established structural
+    # query stable so existing persisted lessons remain retrievable across planner versions.
     lessons = store.retrieve_lessons("protocol assessment progressive specialist purchasing")
-    return plan_with_memory(request, new_id("job"), lessons), lessons
-
+    return plan_with_memory(
+        request, new_id("job"), lessons, objective_intent=objective_intent,
+    ), lessons

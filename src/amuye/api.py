@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 from .domain import JobRequest, new_id, utc_now
 from .live import run_live_assessment
+from .objective import UnsupportedObjectiveError, resolve_objective_intent
 
 
 def live_acp_configuration() -> dict[str, Any]:
@@ -54,6 +55,7 @@ class AssessmentService:
 
     def submit(self, request: dict[str, Any], *, memory_enabled: bool,
                provider_mode: str = "local", acp_confirmed: bool = False) -> str:
+        resolve_objective_intent(JobRequest.from_dict(request))
         if provider_mode == "live_acp" and not acp_confirmed:
             raise ValueError("live ACP execution requires explicit paid-job confirmation")
         if provider_mode == "live_acp" and not self.acp_config["enabled"]:
@@ -160,6 +162,8 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
                         if provider_mode == "live_acp" else "local specialists, no ACP payment"
                     ),
                 })
+            except UnsupportedObjectiveError as exc:
+                self._json(422, {"error": str(exc), **exc.result.to_dict()})
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 self._json(400, {"error": str(exc)})
 

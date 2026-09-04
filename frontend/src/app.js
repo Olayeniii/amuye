@@ -53,7 +53,7 @@ function evidence(mode) {
 }
 
 function jobSummary(mode) {
-  return `<section class="job-strip">
+  return `${mode.intent ? `<section class="intent-strip"><span>Selected intent</span><strong>${safe(mode.intent.intent.replaceAll("_", " "))}</strong><small>${mode.intent.requiredCapabilities.map((item) => safe(labels[item] || item)).join(" · ")}</small><p>${safe(mode.intent.reason)}</p></section>` : ""}<section class="job-strip">
     <div class="job-objective"><span>Objective</span><strong>${safe(mode.request.objective)}</strong></div>
     <div><span>Budget</span><strong>${money(mode.request.maxBudget)} units</strong></div>
     <div><span>Deadline</span><strong>${safe(new Date(mode.request.deadline).toLocaleDateString())}</strong></div>
@@ -176,6 +176,7 @@ function newAssessmentPage() {
       <label class="wide"><span>Hard constraints, one per line</span><textarea name="hardConstraints" required>protocolSlug=aave</textarea><small>Example: protocolSlug=aave. Add "security analysis is mandatory" to enforce security.</small></label>
       <label class="memory-choice"><input name="memoryEnabled" type="checkbox" checked><span>Use Sibyl operational memory</span></label>
       <label class="memory-choice live-acp-choice"><input name="liveAcpEnabled" type="checkbox"><span>Live ACP risk purchase</span><small>Uses Base mainnet and can spend real USDC. You will see a confirmation before submission.</small></label>
+      <p id="assessment-error" class="assessment-error" hidden></p>
       <div class="form-actions"><button type="submit">Run assessment</button><span>Task class: protocol_assessment</span></div>
     </form>
   </main>`;
@@ -202,6 +203,7 @@ function liveResultToMode(result) {
     result: result.finalResult.decision,
     verification: result.finalResult.verification,
     request: result.request,
+    intent: result.strategy.objectiveIntent,
     memory: { enabled: result.memory.enabled, lessonId: recalled[0] || null, applicability: result.memory.applicability, influencedRule: recalled.length ? result.strategy.rationale : "No operational lesson influenced this plan.", adapted: result.strategy.source === "adapted", adaptationReason: result.strategy.source === "adapted" ? result.strategy.applicabilityAssessment : null, source: result.memory.source },
     graph: nodes.map((node) => ({ id: node.id, role: node.type, status: node.status, dependencies: node.dependencies, gate: node.conditionalTrigger, cost: node.actualCost, reason: node.mutationReason, verification: node.evaluationStatus })),
     mutations: result.execution.mutations,
@@ -270,7 +272,9 @@ function render() {
       location.hash = "live-run";
       pollJob(accepted.statusUrl);
     } catch (error) {
-      alert(error.message);
+      const errorBox = event.currentTarget.querySelector("#assessment-error");
+      errorBox.textContent = error.message;
+      errorBox.hidden = false;
       event.currentTarget.querySelector("button").disabled = false;
     }
   });

@@ -17,7 +17,7 @@ from amuye.specialists import StaticProtocolDataSource
 
 
 REQUEST = {
-    "objective": "Assess protocol Aave for integration",
+    "objective": "Assess protocol Aave for integration and identify material risks",
     "maxBudget": 100,
     "deadline": "2026-09-10T18:00:00Z",
     "priority": "balanced",

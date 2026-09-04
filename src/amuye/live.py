@@ -12,6 +12,7 @@ from .domain import JobRequest, LearnedLesson, ProviderJob, ReflectionResult, ne
 from .execution import ExecutionController
 from .learning import evaluate_execution, learn_from_execution
 from .planner import baseline_plan
+from .objective import mandatory_security_constraint, resolve_objective_intent
 from .sibyl_store import SibylStore
 from .settlement import JsonRpc, capture_settlement_proof
 from .specialists import ProtocolAssessmentProvider, ProtocolDataSource
@@ -88,18 +89,22 @@ def run_live_assessment(
     settlement_capture: SettlementCapture | None = None,
     acp_max_cost: float | None = None,
 ) -> dict[str, Any]:
+    request = JobRequest.from_dict(request_value)
+    objective_intent = resolve_objective_intent(request)
     if provider_mode not in {"local", "live_acp"}:
         raise ValueError("provider_mode must be local or live_acp")
     if provider_mode == "live_acp" and not acp_confirmed:
         raise ValueError("live ACP execution requires explicit paid-job confirmation")
-    request = JobRequest.from_dict(request_value)
     store = SibylStore(memory_db)
-    _emit(progress, "intake_accepted", taskClass=request.taskClass)
+    _emit(
+        progress, "intake_accepted", taskClass=request.taskClass,
+        objectiveIntent=objective_intent.to_dict(),
+    )
     _emit(progress, "memory_retrieval_started", enabled=memory_enabled)
     if memory_enabled:
         strategy, recalled = plan_in_fresh_session(request, store)
     else:
-        strategy = baseline_plan(request, new_id("job"))
+        strategy = baseline_plan(request, new_id("job"), objective_intent)
         recalled = []
     memory_source = _memory_source_proof(
         enabled=memory_enabled,
@@ -156,7 +161,8 @@ def run_live_assessment(
     security_purchased = "security_analysis" in result.purchasedRoles
     security_unnecessary = bool(
         risk and risk.get("continueToSecurity") is False and security_purchased
-        and "mandatory security" not in " ".join(request.hardConstraints).lower()
+        and not mandatory_security_constraint(request)
+        and objective_intent.intent != "security_assessment"
     )
     execution_record = {
         "executionId": execution_id,
@@ -182,7 +188,7 @@ def run_live_assessment(
 
     current_lesson = store.get_lesson(strategy.memoryRefs[0]) if strategy.memoryRefs else None
     lesson_update: dict[str, Any] | None = None
-    if current_lesson is not None:
+    if current_lesson is not None and objective_intent.intent != "evidence_only":
         learned = learn_from_execution(store, execution_record, current_lesson, evaluation)
         reflection = learned.reflection
         lesson_update = {

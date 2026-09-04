@@ -48,6 +48,17 @@ class JobRequest:
         )
 
 
+@dataclass(frozen=True)
+class ObjectiveIntent:
+    intent: Literal["evidence_only", "risk_assessment", "security_assessment", "unsupported"]
+    requiredCapabilities: list[str]
+    unsupportedNeeds: list[str]
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 @dataclass
 class TaskNode:
     id: str
@@ -151,6 +162,7 @@ class ExecutionStrategy:
     memoryRefs: list[str]
     rationale: str
     applicabilityAssessment: str
+    objectiveIntent: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

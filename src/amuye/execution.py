@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Protocol
 
 from .domain import ExecutionStrategy, JobRequest, ProviderJob, TaskNode, new_id, utc_now
+from .objective import mandatory_security_constraint
 
 
 TERMINAL_STATUSES = {
@@ -313,8 +314,7 @@ class ExecutionController:
             self.graph._record = record_and_emit  # type: ignore[method-assign]
 
     def _mandatory_security_required(self) -> bool:
-        normalized = " ".join(self.request.hardConstraints).lower().replace("-", " ").replace("_", " ")
-        return "mandatory security" in normalized or "security analysis is mandatory" in normalized
+        return mandatory_security_constraint(self.request)
 
     def _mandatory_security_completed(self) -> bool:
         return any(

@@ -9,14 +9,18 @@ The main product behavior is progressive purchasing. Amúyẹ gathers cheap, use
 ## Architecture
 
 1. Intake validates the request, budget, deadline, and hard constraints.
-2. Sibyl retrieval finds structurally relevant operational lessons.
-3. Planning creates either a cold baseline or a memory-informed graph.
-4. The execution controller enforces dependencies, gates, budget, early stopping, replacement, and mutation reasons.
-5. Role-specific validation checks specialist outputs.
-6. Evaluation and reflection run before any operational lesson mutation.
-7. Execution history and lessons are persisted through Sibyl.
+2. A deterministic objective classifier selects evidence-only, risk, or security capabilities, or rejects unsupported research needs.
+3. Hard constraints can add mandatory security without expanding the supported task class.
+4. Sibyl retrieval finds structurally relevant operational lessons after capability selection.
+5. Planning applies recalled procurement experience only to the selected capabilities.
+6. The execution controller enforces dependencies, gates, budget, early stopping, replacement, and mutation reasons.
+7. Role-specific validation checks specialist outputs.
+8. Evaluation and reflection run before any operational lesson mutation.
+9. Execution history and lessons are persisted through Sibyl.
 
 Viability and security use the local specialist runtime. Risk synthesis can use either the deterministic adapter or a real Virtuals ACP provider purchase.
+
+Within `protocol_assessment`, objectives are constrained to `evidence_only`, `risk_assessment`, or `security_assessment`. Recent governance/protocol research is reported as unsupported rather than being forced through unrelated capabilities. This selection is deterministic and does not use an LLM. The selected intent and capability set are returned in `strategy.objectiveIntent` and shown for live console results.
 
 ## Why Sibyl is load-bearing
 
