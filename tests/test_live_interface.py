@@ -9,6 +9,7 @@ from pathlib import Path
 
 from amuye.api import AssessmentService, make_handler
 from amuye.live import run_live_assessment
+from amuye.sibyl_store import SibylStore
 from amuye.specialists import StaticProtocolDataSource
 
 
@@ -132,3 +133,64 @@ def test_frontend_contains_live_form_and_calls_assessment_api() -> None:
     assert "objective" in source and "maxBudget" in source
     assert "hardConstraints" in source and "clientId" in source
     assert "local specialist path" in source
+
+
+def test_memory_on_source_is_the_sibyl_record_used_by_planning(tmp_path) -> None:
+    source = StaticProtocolDataSource({"aave": PROFILE})
+    database = tmp_path / "sibyl.db"
+    cold = run_live_assessment(
+        REQUEST, memory_enabled=False, memory_db=database, data_source=source,
+    )
+    assert cold["lessonUpdate"]["action"] == "created"
+
+    informed = run_live_assessment(
+        REQUEST, memory_enabled=True, memory_db=database, data_source=source,
+    )
+    proof = informed["memory"]["source"]
+    referenced_id = informed["strategy"]["memoryRefs"][0]
+    persisted = SibylStore(database).get_lesson(referenced_id)
+
+    assert proof["readPerformed"] is True
+    assert proof["returnedLessonIds"] == [referenced_id]
+    assert proof["plannerMemoryRefs"] == [referenced_id]
+    assert proof["records"][0]["id"] == referenced_id
+    assert persisted is not None
+    assert proof["records"][0]["strategy"] == persisted.strategy
+    assert all(
+        SibylStore(database).execution_event_exists(event_id)
+        for event_id in proof["records"][0]["supportingExecutionRefs"]
+    )
+    assert proof["plannerApplicability"] == informed["strategy"]["applicabilityAssessment"]
+    assert proof["influencedRules"]
+
+
+def test_memory_off_performs_no_sibyl_lesson_read(tmp_path, monkeypatch) -> None:
+    calls = 0
+    original = SibylStore.retrieve_lessons
+
+    def tracked(self, request_terms):
+        nonlocal calls
+        calls += 1
+        return original(self, request_terms)
+
+    monkeypatch.setattr(SibylStore, "retrieve_lessons", tracked)
+    result = run_live_assessment(
+        REQUEST,
+        memory_enabled=False,
+        memory_db=tmp_path / "sibyl.db",
+        data_source=StaticProtocolDataSource({"aave": PROFILE}),
+    )
+
+    assert calls == 0
+    assert result["memory"]["source"]["readPerformed"] is False
+    assert result["memory"]["source"]["records"] == []
+    assert result["memory"]["source"]["message"] == "No Sibyl memory read for this run."
+
+
+def test_frontend_source_panel_requires_live_api_memory_result() -> None:
+    source = Path("frontend/src/app.js").read_text(encoding="utf-8")
+    assert "View Sibyl source" in source
+    assert "result.memory.source" in source
+    assert "lesson_progressive_specialist_purchasing_v1" not in source
+    assert "comparison.control.persistedLesson" not in source
+    assert "localStorage" not in source

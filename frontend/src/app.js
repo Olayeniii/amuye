@@ -62,6 +62,36 @@ function jobSummary(mode) {
   </section>`;
 }
 
+function memorySourcePanel(memory) {
+  const source = memory.source;
+  if (!memory.enabled) {
+    return `<div class="memory-source unavailable"><strong>View Sibyl source</strong><span>No Sibyl memory read for this run.</span></div>`;
+  }
+  if (!source) {
+    return `<div class="memory-source unavailable"><strong>View Sibyl source</strong><span>This is reproducible artifact evidence, not a live Sibyl response. Run a Memory ON assessment to inspect its source record.</span></div>`;
+  }
+  if (!source.readPerformed || !source.records.length) {
+    return `<details class="memory-source"><summary>View Sibyl source</summary><div class="source-empty">${safe(source.message)}</div></details>`;
+  }
+  return `<details class="memory-source"><summary>View Sibyl source</summary>
+    <div class="source-session"><span>Process</span><code>${safe(source.processSessionId)}</code><span>Sibyl source</span><code>${safe(source.databaseSource)}</code><span>Returned</span><code>${safe(source.returnedLessonIds.join(", "))}</code><span>Applied by plan</span><code>${safe(source.plannerMemoryRefs.join(", ") || "None")}</code></div>
+    ${source.records.map((lesson) => `<div class="source-record">
+      <div><span>Lesson ID</span><code>${safe(lesson.id)}</code></div>
+      <div><span>Task pattern</span><strong>${safe(lesson.taskPattern)}</strong></div>
+      <div class="wide"><span>Learned strategy</span><p>${safe(lesson.strategy)}</p></div>
+      <div class="wide"><span>Reasoning</span><p>${safe(lesson.reasoning)}</p></div>
+      <div class="wide"><span>Applicability conditions</span><p>${lesson.applicabilityConditions.map(safe).join(" · ")}</p></div>
+      <div class="wide"><span>Non-applicability conditions</span><p>${lesson.nonApplicabilityConditions.map(safe).join(" · ")}</p></div>
+      <div><span>Confidence</span><strong>${safe(lesson.confidence)}</strong></div>
+      <div><span>Status</span><strong>${safe(lesson.status)}</strong></div>
+      <div><span>Last updated</span><strong>${safe(lesson.lastUpdatedAt)}</strong></div>
+      <div class="wide"><span>Supporting Sibyl journal events</span><code>${safe(lesson.supportingExecutionRefs.join(", ") || "None")}</code></div>
+      <div class="wide"><span>Contradictory evidence</span><code>${safe(lesson.contradictoryEvidenceRefs.join(", ") || "None")}</code></div>
+    </div>`).join("")}
+    <div class="source-decision"><span>Planner applicability</span><p>${safe(source.plannerApplicability)}</p><span>Execution rule influenced</span>${source.influencedRules.map((item) => `<p><strong>${safe(labels[item.taskNode] || item.taskNode)}:</strong> ${safe(item.rule)} <small>${safe(item.reason)}</small></p>`).join("")}</div>
+  </details>`;
+}
+
 function modePage(mode) {
   const comparison = mode.key === "memory-off" || mode.key === "memory-on" ? `<div class="comparison-bar"><span>Controlled difference</span><b class="${mode.key === "memory-off" ? "selected" : ""}">Memory OFF · security purchased · 95 units</b><b class="${mode.key === "memory-on" ? "selected" : ""}">Memory ON · security skipped · 35 units</b></div>` : "";
   return `
@@ -92,6 +122,7 @@ function modePage(mode) {
               <div><dt>Rule influenced</dt><dd>${safe(mode.memory.influencedRule)}</dd></div>
               <div><dt>Adapted for constraints</dt><dd>${mode.memory.adapted ? "Yes" : "No"}${mode.memory.adaptationReason ? `<small>${safe(mode.memory.adaptationReason)}</small>` : ""}</dd></div>
             </dl>
+            ${memorySourcePanel(mode.memory)}
           </section>
           <section class="panel summary-panel">
             <div class="panel-label">Execution summary</div>
@@ -150,7 +181,7 @@ function liveResultToMode(result) {
     result: result.finalResult.decision,
     verification: result.finalResult.verification,
     request: result.request,
-    memory: { enabled: result.memory.enabled, lessonId: recalled[0] || null, applicability: result.memory.applicability, influencedRule: recalled.length ? result.strategy.rationale : "No operational lesson influenced this plan.", adapted: result.strategy.source === "adapted", adaptationReason: result.strategy.source === "adapted" ? result.strategy.applicabilityAssessment : null },
+    memory: { enabled: result.memory.enabled, lessonId: recalled[0] || null, applicability: result.memory.applicability, influencedRule: recalled.length ? result.strategy.rationale : "No operational lesson influenced this plan.", adapted: result.strategy.source === "adapted", adaptationReason: result.strategy.source === "adapted" ? result.strategy.applicabilityAssessment : null, source: result.memory.source },
     graph: nodes.map((node) => ({ id: node.id, role: node.type, status: node.status, dependencies: node.dependencies, gate: node.conditionalTrigger, cost: node.actualCost, reason: node.mutationReason, verification: node.evaluationStatus })),
     mutations: result.execution.mutations,
     execution: { purchased: result.execution.purchasedRoles.map((role) => ({ role })), order: result.execution.purchasedRoles, spent: result.execution.spent, remaining: result.execution.remainingBudget, stoppedEarly: result.execution.stoppedEarly, stopReason: result.execution.stopReason },

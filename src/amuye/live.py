@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import os
 from pathlib import Path
 from typing import Any, Callable
+from uuid import uuid4
 
 from .checkpoint import plan_in_fresh_session
 from .domain import JobRequest, LearnedLesson, ReflectionResult, new_id, utc_now
@@ -15,11 +17,59 @@ from .specialists import ProtocolAssessmentProvider, ProtocolDataSource
 
 Progress = Callable[[dict[str, Any]], None]
 LESSON_ID = "lesson_progressive_specialist_purchasing_v1"
+PROCESS_SESSION_ID = f"amuye-process-{os.getpid()}-{uuid4().hex[:8]}"
 
 
 def _emit(callback: Progress | None, event_type: str, **values: Any) -> None:
     if callback is not None:
         callback({"type": event_type, "at": utc_now(), **values})
+
+
+def _memory_source_proof(
+    *,
+    enabled: bool,
+    store: SibylStore,
+    recalled: list[LearnedLesson],
+    strategy: Any,
+) -> dict[str, Any]:
+    if not enabled:
+        return {
+            "readPerformed": False,
+            "message": "No Sibyl memory read for this run.",
+            "processSessionId": PROCESS_SESSION_ID,
+            "databaseSource": None,
+            "returnedLessonIds": [],
+            "plannerMemoryRefs": [],
+            "records": [],
+            "plannerApplicability": strategy.applicabilityAssessment,
+            "influencedRules": [],
+        }
+
+    returned_ids = [lesson.id for lesson in recalled]
+    influenced_rules = [
+        {
+            "taskNode": node.type,
+            "rule": node.conditionalTrigger or "Unconditional for this job",
+            "reason": node.mutationReason,
+        }
+        for node in strategy.orderedSteps
+        if node.mutationReason
+        and any(lesson_id in node.mutationReason for lesson_id in returned_ids)
+    ]
+    return {
+        "readPerformed": True,
+        "message": (
+            "Sibyl returned persisted operational memory to planning."
+            if recalled else "Sibyl was queried but returned no applicable lesson."
+        ),
+        "processSessionId": PROCESS_SESSION_ID,
+        "databaseSource": store.database_path,
+        "returnedLessonIds": returned_ids,
+        "plannerMemoryRefs": list(strategy.memoryRefs),
+        "records": [lesson.to_dict() for lesson in recalled],
+        "plannerApplicability": strategy.applicabilityAssessment,
+        "influencedRules": influenced_rules,
+    }
 
 
 def run_live_assessment(
@@ -39,6 +89,12 @@ def run_live_assessment(
     else:
         strategy = baseline_plan(request, new_id("job"))
         recalled = []
+    memory_source = _memory_source_proof(
+        enabled=memory_enabled,
+        store=store,
+        recalled=recalled,
+        strategy=strategy,
+    )
     _emit(
         progress,
         "plan_created",
@@ -140,6 +196,7 @@ def run_live_assessment(
             "enabled": memory_enabled,
             "recalledLessonIds": [lesson.id for lesson in recalled],
             "applicability": strategy.applicabilityAssessment,
+            "source": memory_source,
         },
         "strategy": strategy.to_dict(),
         "execution": asdict(result),
