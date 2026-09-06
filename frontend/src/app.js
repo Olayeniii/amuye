@@ -92,6 +92,41 @@ function memorySourcePanel(memory) {
   </details>`;
 }
 
+function memoryConsequencePanel(mode) {
+  if (mode.key !== "memory-off" && mode.key !== "memory-on") return "";
+  const proof = data.memoryConsequence;
+  const off = proof.withoutExperience;
+  const on = proof.withExperience;
+  return `<section class="memory-consequence panel">
+    <div class="section-head"><div><p class="eyebrow">What Sibyl changed</p><h2>Prior execution experience changed one purchase</h2></div><span>Same task · same budget · same specialists</span></div>
+    <div class="consequence-grid">
+      <article class="consequence-run ${mode.key === "memory-off" ? "active" : ""}">
+        <p>No prior execution experience</p>
+        <strong>${safe(off.specialistsCommissioned)} specialists commissioned</strong>
+        <dl><div><dt>Spend</dt><dd>${money(off.spend)} / ${money(off.budget)} budget units</dd></div><div><dt>Security specialist</dt><dd>${safe(off.securityStatus === "completed" ? "Commissioned" : off.securityStatus)}</dd></div><div><dt>Reason</dt><dd>Cold execution</dd></div></dl>
+      </article>
+      <article class="consequence-run recalled ${mode.key === "memory-on" ? "active" : ""}">
+        <p>Experience recalled from Sibyl</p>
+        <strong>${safe(on.specialistsCommissioned)} specialists commissioned</strong>
+        <dl><div><dt>Spend</dt><dd>${money(on.spend)} / ${money(on.budget)} budget units</dd></div><div><dt>Security specialist</dt><dd>${safe(on.securityStatus === "skipped" ? "Skipped unnecessary security purchase" : on.securityStatus)}</dd></div><div><dt>Reason</dt><dd>${safe(on.reason)}</dd></div></dl>
+      </article>
+    </div>
+    <div class="consequence-result"><strong>${safe(proof.avoidedSpecialistCount)} unnecessary specialist purchase avoided</strong><strong>${money(proof.preservedBudget)} budget units preserved</strong></div>
+  </section>`;
+}
+
+function memoryCausalStrip(mode) {
+  if (mode.key !== "memory-on") return "";
+  const proof = data.memoryConsequence.withExperience;
+  return `<section class="causal-strip" aria-label="Sibyl procurement consequence">
+    <span>Experience recalled from Sibyl<small>${safe(proof.recalledLessonId)}</small></span>
+    <i>→</i><span>Security became conditional<small>${safe(proof.securityGate)}</small></span>
+    <i>→</i><span>Risk evidence did not justify deeper work<small>continueToSecurity: ${safe(proof.riskContinueToSecurity)}</small></span>
+    <i>→</i><span>Security purchase skipped<small>${safe(proof.securitySkipReason)}</small></span>
+    <i>→</i><span>${money(data.memoryConsequence.preservedBudget)} budget units preserved</span>
+  </section>`;
+}
+
 function modePage(mode) {
   const comparison = mode.key === "memory-off" || mode.key === "memory-on" ? `<div class="comparison-bar"><span>Controlled difference</span><b class="${mode.key === "memory-off" ? "selected" : ""}">Memory OFF · security purchased · 95 units</b><b class="${mode.key === "memory-on" ? "selected" : ""}">Memory ON · security skipped · 35 units</b></div>` : "";
   return `
@@ -105,6 +140,8 @@ function modePage(mode) {
         <div class="spend-orb"><small>Spent</small><strong>${money(mode.execution.spent)}</strong><span>budget units</span><span>${money(mode.execution.remaining)} remaining</span></div>
       </section>
       ${comparison}
+      ${memoryConsequencePanel(mode)}
+      ${memoryCausalStrip(mode)}
       ${jobSummary(mode)}
       <div class="main-grid">
         <section class="panel graph-panel">
@@ -115,7 +152,9 @@ function modePage(mode) {
         <aside class="side-stack">
           <section class="panel memory-panel">
             <div class="panel-label"><span class="signal ${mode.memory.enabled ? "on" : ""}"></span>Sibyl memory ${mode.memory.enabled ? "ON" : "OFF"}</div>
-            <h2>${mode.memory.enabled ? "Experience applied" : "Cold strategy"}</h2>
+            <h2>${mode.memory.enabled ? "Experience recalled from Sibyl" : "No prior execution experience"}</h2>
+            ${mode.key === "memory-on" ? `<p class="fresh-session-statement">Fresh process. Prior conversation unavailable.<strong>Sibyl recalled ${safe(data.memoryConsequence.withExperience.recalledLessonCount)} applicable execution lesson</strong></p>` : ""}
+            ${mode.key === "memory-off" ? `<p class="fresh-session-statement">Fresh process. No prior execution experience available.<strong>No Sibyl memory read for this run.</strong></p>` : ""}
             <dl class="stacked-list">
               <div><dt>Recalled lesson</dt><dd>${safe(mode.memory.lessonId || "None")}</dd></div>
               ${mode.memory.freshProcessId ? `<div><dt>Fresh process</dt><dd>${safe(mode.memory.freshProcessId)}</dd></div>` : ""}

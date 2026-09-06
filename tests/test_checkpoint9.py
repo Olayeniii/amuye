@@ -37,6 +37,55 @@ def test_console_build_contains_three_required_demo_modes() -> None:
                 if node["role"] == "security_analysis")["status"] == "skipped"
 
 
+def test_memory_consequence_is_derived_from_controlled_execution_evidence() -> None:
+    payload = built_payload()
+    consequence = payload["memoryConsequence"]
+    modes = {mode["key"]: mode for mode in payload["modes"]}
+    off = modes["memory-off"]
+    on = modes["memory-on"]
+    security = next(node for node in on["graph"]
+                    if node["role"] == "security_analysis")
+    risk = next(item for item in on["evidence"]
+                if item["role"] == "risk_synthesis")
+
+    assert consequence["withoutExperience"]["specialistsCommissioned"] == len(
+        off["execution"]["purchased"])
+    assert consequence["withExperience"]["specialistsCommissioned"] == len(
+        on["execution"]["purchased"])
+    assert consequence["withoutExperience"]["spend"] == off["execution"]["spent"]
+    assert consequence["withExperience"]["spend"] == on["execution"]["spent"]
+    assert consequence["preservedBudget"] == (
+        off["execution"]["spent"] - on["execution"]["spent"])
+    assert consequence["avoidedSpecialistCount"] == 1
+    assert consequence["withExperience"]["securityStatus"] == security["status"]
+    assert consequence["withExperience"]["securitySkipReason"] == security["reason"]
+    assert consequence["withExperience"]["securityGate"] == security["gate"]
+    assert consequence["withExperience"]["riskContinueToSecurity"] == risk["continueToSecurity"]
+
+
+def test_memory_consequence_traces_lesson_and_distinct_fresh_processes() -> None:
+    consequence = built_payload()["memoryConsequence"]
+    off = consequence["withoutExperience"]
+    on = consequence["withExperience"]
+
+    assert off["freshProcessId"] != on["freshProcessId"]
+    assert off["memoryReadPerformed"] is False
+    assert on["memoryReadPerformed"] is True
+    assert on["recalledLessonCount"] == 1
+    assert on["recalledLessonId"] in on["planningMemoryRefs"]
+
+
+def test_console_presents_memory_consequence_before_source_proof() -> None:
+    source = (ROOT / "frontend" / "src" / "app.js").read_text(encoding="utf-8")
+    assert "No prior execution experience" in source
+    assert "Experience recalled from Sibyl" in source
+    assert "Skipped unnecessary security purchase" in source
+    assert "budget units preserved" in source
+    assert "Fresh process. Prior conversation unavailable." in source
+    assert source.index("memoryConsequencePanel(mode)") < source.index(
+        "memorySourcePanel(mode.memory)")
+
+
 def test_changed_constraint_mode_surfaces_partial_adaptation() -> None:
     mode = next(item for item in built_payload()["modes"]
                 if item["key"] == "mandatory-security")

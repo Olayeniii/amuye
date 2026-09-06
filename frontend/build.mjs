@@ -73,6 +73,57 @@ function compactRun(key, label, run, overrides = {}) {
 
 const modeA = compactRun("memory-off", "Memory OFF", comparison.runA_memoryOff);
 const modeB = compactRun("memory-on", "Memory ON", comparison.runB_memoryOn);
+const controlledProof = comparison.comparison;
+const memoryOffSecurity = comparison.runA_memoryOff.execution.finalGraph.find(
+  (node) => node.type === "security_analysis",
+);
+const memoryOnSecurity = comparison.runB_memoryOn.execution.finalGraph.find(
+  (node) => node.type === "security_analysis",
+);
+const memoryOnRisk = comparison.runB_memoryOn.execution.result.evidence.find(
+  (item) => item.role === "risk_synthesis",
+);
+const memoryConsequence = {
+  withoutExperience: {
+    freshProcessId: comparison.runA_memoryOff.freshProcessId,
+    memoryReadPerformed: comparison.runA_memoryOff.memory.operationalMemoryAvailableToPlanner,
+    specialistsCommissioned: comparison.runA_memoryOff.execution.providerJobsPurchased.length,
+    spend: comparison.runA_memoryOff.execution.spent,
+    budget: comparison.runA_memoryOff.request.maxBudget,
+    securityStatus: memoryOffSecurity.status,
+    reason: comparison.runA_memoryOff.strategy.source,
+  },
+  withExperience: {
+    freshProcessId: comparison.runB_memoryOn.freshProcessId,
+    memoryReadPerformed: comparison.runB_memoryOn.memory.operationalMemoryAvailableToPlanner,
+    recalledLessonCount: comparison.runB_memoryOn.memory.recalledLessonIds.length,
+    recalledLessonId: comparison.runB_memoryOn.memory.recalledLessonIds[0],
+    planningMemoryRefs: comparison.runB_memoryOn.memory.strategyMemoryRefs,
+    specialistsCommissioned: comparison.runB_memoryOn.execution.providerJobsPurchased.length,
+    spend: comparison.runB_memoryOn.execution.spent,
+    budget: comparison.runB_memoryOn.request.maxBudget,
+    securityStatus: memoryOnSecurity.status,
+    securityGate: memoryOnSecurity.conditionalTrigger,
+    securitySkipReason: memoryOnSecurity.mutationReason,
+    riskContinueToSecurity: memoryOnRisk.continueToSecurity,
+    reason: controlledProof.changedAction.lessonTrace,
+  },
+  avoidedSpecialistCount: controlledProof.rolesPurchasedOnlyWithMemoryOff.length,
+  preservedBudget: controlledProof.spendAvoidedByMemory,
+};
+
+if (
+  memoryConsequence.withoutExperience.spend - memoryConsequence.withExperience.spend
+    !== memoryConsequence.preservedBudget
+  || memoryConsequence.withExperience.securitySkipReason
+    !== controlledProof.changedAction.memoryOnReason
+  || memoryConsequence.withExperience.recalledLessonId !== controlledProof.recalledLessonId
+  || !memoryConsequence.withExperience.planningMemoryRefs.includes(
+    memoryConsequence.withExperience.recalledLessonId,
+  )
+) {
+  throw new Error("Controlled memory consequence does not match backend execution evidence");
+}
 const changedRun = {
   request: adaptation.request,
   memory: {
@@ -118,6 +169,7 @@ const payload = {
     name: "Amúyẹ",
     line: "Give Amúyẹ a job, budget, and deadline. It buys specialist work only as evidence requires, then carries the lesson into the next run.",
   },
+  memoryConsequence,
   modes: [modeA, modeB, modeC],
   partnerProof: {
     jobId: settlement.jobId,
