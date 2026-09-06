@@ -95,11 +95,23 @@ async function main(): Promise<void> {
       }
     }
   });
+
   await seller.start();
   process.stderr.write(`[amuye-risk-provider] listening at ${address}\n`);
-  const stop = async () => { await seller.stop(); process.exit(0); };
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
+
+  const keepAlive = setInterval(() => undefined, 60_000);
+  await new Promise<void>((resolve, reject) => {
+    let stopping = false;
+    const stop = () => {
+      if (stopping) return;
+      stopping = true;
+      clearInterval(keepAlive);
+      void seller.stop().then(resolve, reject);
+    };
+
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
 }
 
 main().catch((error) => {
