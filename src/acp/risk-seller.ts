@@ -96,25 +96,41 @@ async function main(): Promise<void> {
     }
   });
 
-  await seller.start();
-  process.stderr.write(`[amuye-risk-provider] listening at ${address}\n`);
-
+  // A pending Promise alone does not keep Node alive. Keep an event-loop handle
+  // active before seller.start() begins connecting so the ACP SSE listener can
+  // establish itself even if start() has not resolved yet.
   const keepAlive = setInterval(() => undefined, 60_000);
-  await new Promise<void>((resolve, reject) => {
-    let stopping = false;
-    const stop = () => {
-      if (stopping) return;
-      stopping = true;
-      clearInterval(keepAlive);
-      void seller.stop().then(resolve, reject);
-    };
-
-    process.once("SIGINT", stop);
-    process.once("SIGTERM", stop);
+  let stopping = false;
+  let resolveShutdown!: () => void;
+  let rejectShutdown!: (error: unknown) => void;
+  const shutdown = new Promise<void>((resolve, reject) => {
+    resolveShutdown = resolve;
+    rejectShutdown = reject;
   });
+
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    clearInterval(keepAlive);
+    void seller.stop().then(resolveShutdown, rejectShutdown);
+  };
+
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+
+  try {
+    await seller.start(() => {
+      process.stderr.write(`[amuye-risk-provider] listening at ${address}\n`);
+    });
+    await shutdown;
+  } finally {
+    clearInterval(keepAlive);
+    process.removeListener("SIGINT", stop);
+    process.removeListener("SIGTERM", stop);
+  }
 }
 
 main().catch((error) => {
-  process.stderr.write(String(error));
+  process.stderr.write(`${String(error)}\n`);
   process.exitCode = 1;
 });
