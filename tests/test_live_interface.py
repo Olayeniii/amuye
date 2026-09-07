@@ -270,9 +270,16 @@ def test_http_live_acp_confirmation_and_config_boundary(tmp_path) -> None:
         response = connection.getresponse()
         config = json.loads(response.read())
         assert response.status == 200
-        assert config["provider"] == ACP_CONFIG["provider"]
+        assert config["enabled"] is True
+        assert config["offering"] == "riskSynthesis"
         assert config["network"] == "Base mainnet"
-        assert not any("key" in name.lower() or "wallet_id" in name.lower()
+        assert config["chainId"] == 8453
+        assert config["maxExpectedSpend"] == 25.0
+        assert config["asset"] == "USDC"
+        assert config["status"] == "Live ACP is configured"
+        assert "provider" not in config
+        assert "missingConfiguration" not in config
+        assert not any("key" in name.lower() or "wallet" in name.lower()
                        for name in config)
 
         connection.request(
