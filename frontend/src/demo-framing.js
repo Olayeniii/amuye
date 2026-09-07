@@ -45,7 +45,7 @@ function proofCard(modeKey) {
       <b>→</b>
       <div><small>Usefulness evaluated</small><strong>${PURCHASE_PROOF.priorOutcome}</strong><span>Accepted risk evidence had already resolved whether deeper work was needed.</span></div>
       <b>→</b>
-      <div><small>Stored in Sibyl</small><strong>${PURCHASE_PROOF.learnedPolicy}</strong><span>Memory is a conditional repurchase policy, not a claim that security is always useless.</span></div>
+      <div><small>Stored in Sibyl</small><strong>${PURCHASE_PROOF.learnedPolicy}</strong><span>Sibyl preserves this learned purchasing experience so a fresh Amúyẹ process can recall it before deciding whether to buy security analysis again.</span></div>
       <b>→</b>
       <div><small>Fresh-process decision</small><strong>${PURCHASE_PROOF.freshDecision}</strong><span>Current risk evidence did not justify buying the same specialist again.</span></div>
     </div>`;
