@@ -45,6 +45,7 @@ class AssessmentService:
         acp_config: dict[str, Any] | None = None,
     ) -> None:
         self.memory_db = Path(memory_db)
+        self.partner_proof_path = self.memory_db.parent / "latest-partner-proof.json"
         self.runner = runner
         self.data_source = data_source
         self.acp_client = acp_client
@@ -79,6 +80,39 @@ class AssessmentService:
         ).start()
         return api_job_id
 
+    def _persist_partner_proof(self, result: dict[str, Any]) -> None:
+        if result.get("providerMode") != "live Virtuals ACP risk purchase on Base mainnet":
+            return
+        jobs = result.get("execution", {}).get("providerJobs", [])
+        proofs = result.get("settlementProofs", [])
+        for job in reversed(jobs):
+            acp_job_id = job.get("acpJobId")
+            if not acp_job_id:
+                continue
+            proof = next(
+                (item for item in proofs if str(item.get("jobId")) == str(acp_job_id)),
+                None,
+            )
+            if proof is None:
+                continue
+            payload = {
+                "job": job,
+                "proof": proof,
+                "capturedAt": utc_now(),
+            }
+            self.partner_proof_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self.partner_proof_path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            temporary.replace(self.partner_proof_path)
+            return
+
+    def latest_partner_proof(self) -> dict[str, Any] | None:
+        try:
+            value = json.loads(self.partner_proof_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        return value if isinstance(value, dict) else None
+
     def _run(self, api_job_id: str, request: dict[str, Any], memory_enabled: bool,
              provider_mode: str, acp_confirmed: bool) -> None:
         def progress(event: dict[str, Any]) -> None:
@@ -101,6 +135,7 @@ class AssessmentService:
                 acp_max_cost=(self.acp_config["maxExpectedSpend"]
                               if provider_mode == "live_acp" else None),
             )
+            self._persist_partner_proof(result)
             with self.lock:
                 self.jobs[api_job_id]["status"] = result["status"]
                 self.jobs[api_job_id]["result"] = result
@@ -180,6 +215,10 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
                     "asset": config["asset"],
                     "status": "Live ACP is configured" if config["enabled"] else "Live ACP is not configured",
                 })
+                return
+            if parsed.path == "/api/partner-proof/latest":
+                proof = service.latest_partner_proof()
+                self._json(200, proof) if proof else self._json(404, {"error": "no live partner proof recorded yet"})
                 return
             if parsed.path.startswith("/api/assessments/"):
                 api_job_id = parsed.path.rsplit("/", 1)[-1]
