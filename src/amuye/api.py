@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
+from .assessment_history import AssessmentHistoryStore
 from .domain import JobRequest, new_id, utc_now
 from .live import run_live_assessment
 from .objective import UnsupportedObjectiveError, resolve_objective_intent
@@ -43,9 +44,13 @@ class AssessmentService:
         acp_client: Any = None,
         settlement_capture: Any = None,
         acp_config: dict[str, Any] | None = None,
+        history_db: str | Path | None = None,
     ) -> None:
         self.memory_db = Path(memory_db)
         self.partner_proof_path = self.memory_db.parent / "latest-partner-proof.json"
+        self.history = AssessmentHistoryStore(
+            history_db or self.memory_db.parent / "assessment-history.db"
+        )
         self.runner = runner
         self.data_source = data_source
         self.acp_client = acp_client
@@ -53,6 +58,11 @@ class AssessmentService:
         self.acp_config = acp_config or live_acp_configuration()
         self.jobs: dict[str, dict[str, Any]] = {}
         self.lock = threading.Lock()
+
+    def _persist_job_locked(self, api_job_id: str) -> None:
+        job = self.jobs[api_job_id]
+        job["updatedAt"] = utc_now()
+        self.history.upsert(job)
 
     def submit(self, request: dict[str, Any], *, memory_enabled: bool,
                provider_mode: str = "local", acp_confirmed: bool = False) -> str:
@@ -62,17 +72,21 @@ class AssessmentService:
         if provider_mode == "live_acp" and not self.acp_config["enabled"]:
             raise ValueError("live ACP execution is not configured")
         api_job_id = new_id("api_job")
+        created_at = utc_now()
         with self.lock:
             self.jobs[api_job_id] = {
                 "id": api_job_id,
+                "createdAt": created_at,
+                "updatedAt": created_at,
                 "status": "accepted",
                 "memoryEnabled": memory_enabled,
                 "providerMode": provider_mode,
                 "request": request,
-                "events": [{"type": "request_accepted", "at": utc_now()}],
+                "events": [{"type": "request_accepted", "at": created_at}],
                 "result": None,
                 "error": None,
             }
+            self.history.upsert(self.jobs[api_job_id])
         threading.Thread(
             target=self._run,
             args=(api_job_id, request, memory_enabled, provider_mode, acp_confirmed),
@@ -120,6 +134,7 @@ class AssessmentService:
             with self.lock:
                 self.jobs[api_job_id]["events"].append(event)
                 self.jobs[api_job_id]["status"] = "executing"
+                self._persist_job_locked(api_job_id)
 
         try:
             result = self.runner(
@@ -139,6 +154,7 @@ class AssessmentService:
             with self.lock:
                 self.jobs[api_job_id]["status"] = result["status"]
                 self.jobs[api_job_id]["result"] = result
+                self._persist_job_locked(api_job_id)
         except Exception as exc:
             with self.lock:
                 self.jobs[api_job_id]["status"] = "failed"
@@ -146,11 +162,17 @@ class AssessmentService:
                 self.jobs[api_job_id]["events"].append({
                     "type": "execution_failed", "at": utc_now(), "error": str(exc),
                 })
+                self._persist_job_locked(api_job_id)
 
     def get(self, api_job_id: str) -> dict[str, Any] | None:
         with self.lock:
             value = self.jobs.get(api_job_id)
-            return json.loads(json.dumps(value)) if value is not None else None
+            if value is not None:
+                return json.loads(json.dumps(value))
+        return self.history.get(api_job_id)
+
+    def list_history(self, limit: int = 50) -> list[dict[str, Any]]:
+        return self.history.list(limit)
 
 
 def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequestHandler]:
@@ -220,6 +242,15 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
                 proof = service.latest_partner_proof()
                 self._json(200, proof) if proof else self._json(404, {"error": "no live partner proof recorded yet"})
                 return
+            if parsed.path == "/api/assessments":
+                query = parse_qs(parsed.query)
+                try:
+                    limit = int(query.get("limit", ["50"])[0])
+                except ValueError:
+                    self._json(400, {"error": "limit must be an integer"})
+                    return
+                self._json(200, {"assessments": service.list_history(limit)})
+                return
             if parsed.path.startswith("/api/assessments/"):
                 api_job_id = parsed.path.rsplit("/", 1)[-1]
                 job = service.get(api_job_id)
@@ -261,9 +292,11 @@ def main() -> None:
     port = int(os.environ.get("PORT", "4173"))
     memory_db = Path(os.environ.get("AMUYE_MEMORY_DB", root / "artifacts" / "live" / "sibyl.db"))
     memory_db.parent.mkdir(parents=True, exist_ok=True)
-    service = AssessmentService(memory_db)
+    history_db = Path(os.environ.get("AMUYE_HISTORY_DB", memory_db.parent / "assessment-history.db"))
+    service = AssessmentService(memory_db, history_db=history_db)
     server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(service, dist))
     print(f"Amúyẹ live console: http://localhost:{port}")
+    print(f"Assessment history: {history_db}")
     state = "enabled with explicit confirmation" if service.acp_config["enabled"] else "not configured"
     print(f"Live ACP risk purchasing is {state}.")
     server.serve_forever()
