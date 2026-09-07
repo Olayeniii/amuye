@@ -170,7 +170,16 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
             if parsed.path == "/api/acp/config":
-                self._json(200, service.acp_config)
+                config = service.acp_config
+                self._json(200, {
+                    "enabled": config["enabled"],
+                    "offering": config["offering"],
+                    "network": config["network"],
+                    "chainId": config["chainId"],
+                    "maxExpectedSpend": config["maxExpectedSpend"],
+                    "asset": config["asset"],
+                    "status": "Live ACP is configured" if config["enabled"] else "Live ACP is not configured",
+                })
                 return
             if parsed.path.startswith("/api/assessments/"):
                 api_job_id = parsed.path.rsplit("/", 1)[-1]
