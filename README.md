@@ -178,7 +178,7 @@ New assessments use local protocol specialists by default and cannot spend ACP f
 
 Set `AMUYE_MEMORY_DB` to choose the Sibyl database. The default is `artifacts/live/sibyl.db`. Live ACP mode also requires the buyer and provider values in `.env.example`; `ACP_RISK_MAX_EXPECTED_SPEND` is the hard maximum passed to the ACP buyer after confirmation.
 
-For a live source demonstration, run the same assessment first with memory disabled, then submit it again with memory enabled. The first execution writes evaluated experience to the Sibyl database. The second reads it during planning. Open `View Sibyl source` on the second result to show the exact planning-time record, database source, process identifier, applicability decision, and rule applied. The footer shows the source commit and console build time throughout the recording.
+For a live source demonstration, run the same assessment first with memory disabled, then submit it again with memory enabled. The first execution writes evaluated experience to the Sibyl database. The second reads it during planning. Open `View Sibyl source` on the second result to show the exact planning-time record, database source, process identifier, applicability decision, and rule applied.
 
 Another agent or client can submit the same request contract without the frontend:
 
@@ -233,6 +233,6 @@ Python tests use deterministic providers and mocked Base RPC responses. CI does 
 
 Amúyẹ was implemented during this hackathon build window. The repository history begins on September 2, 2026 with the initial Sibyl-backed planning proof, followed by the execution controller, specialist behavior, Virtuals ACP integration, Base settlement verification, controlled memory tests, and judge console. No earlier Amúyẹ application codebase was imported into this repository. Third-party Sibyl, Virtuals ACP, Base, and public protocol-data services are credited dependencies rather than prior Amúyẹ work.
 
-## License and submission
+## License
 
-Amúyẹ is released under the OSI-approved [MIT License](LICENSE). The public-post and final-access checks that must be completed manually are listed in [SUBMISSION_CHECKLIST.md](SUBMISSION_CHECKLIST.md). No user, traction, revenue, or testimonial claims are made without public evidence.
+Amúyẹ is released under the OSI-approved [MIT License](LICENSE).
