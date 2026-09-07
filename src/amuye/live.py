@@ -135,6 +135,7 @@ def run_live_assessment(
         request,
         strategy,
         provider,
+        max_replacements_per_role=0 if provider_mode == "live_acp" else 1,
         event_callback=progress,
     )
     result = controller.run()
