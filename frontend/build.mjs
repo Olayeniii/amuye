@@ -199,6 +199,7 @@ await mkdir(resolve(dist, "assets"), { recursive: true });
 await cp(resolve(frontend, "index.html"), resolve(dist, "index.html"));
 await cp(resolve(frontend, "src", "app.js"), resolve(dist, "app.js"));
 await cp(resolve(frontend, "src", "styles.css"), resolve(dist, "styles.css"));
+await cp(resolve(frontend, "src", "readability.css"), resolve(dist, "readability.css"));
 await cp(resolve(frontend, "assets", "amuye-logo.png"), resolve(dist, "assets", "amuye-logo.png"));
 await writeFile(resolve(dist, "demo-data.json"), `${JSON.stringify(payload, null, 2)}\n`);
 console.log(`Built Amúyẹ execution console at ${dist}`);
