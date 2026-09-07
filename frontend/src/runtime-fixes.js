@@ -2,6 +2,7 @@ const nativeFetch = window.fetch.bind(window);
 const nativeConfirm = window.confirm.bind(window);
 const LIVE_PROOF_KEY = "amuye.latestLivePartnerProof";
 let approvedPaidJob = false;
+let proofRenderInFlight = false;
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
@@ -51,7 +52,7 @@ function showPaidJobModal(form, config) {
     <div class="acp-confirm-facts">
       <div><span>Offering</span><strong>${escapeHtml(config.offering || "riskSynthesis")}</strong></div>
       <div><span>Network</span><strong>${escapeHtml(config.network || "Base mainnet")}</strong></div>
-      <div><span>Expected job spend</span><strong>0.1 ${escapeHtml(config.asset || "USDC")}</strong></div>
+      <div><span>Maximum expected spend</span><strong>${amount(config.maxExpectedSpend)} ${escapeHtml(config.asset || "USDC")}</strong></div>
     </div>
     <p class="acp-confirm-warning">This creates and funds a real paid job.</p>
     <div class="acp-confirm-actions"><button type="button" class="secondary" data-cancel>Cancel</button><button type="button" data-approve>Create paid job</button></div>
@@ -91,27 +92,50 @@ document.addEventListener("submit", async (event) => {
   }
 }, true);
 
-function renderLatestPartnerProof() {
-  if (location.hash !== "#partner-proof") return;
+async function loadLatestPartnerProof() {
+  try {
+    const response = await nativeFetch("/api/partner-proof/latest", { cache: "no-store" });
+    if (response.ok) {
+      const latest = await response.json();
+      if (latest?.job && latest?.proof) {
+        sessionStorage.setItem(LIVE_PROOF_KEY, JSON.stringify(latest));
+        return latest;
+      }
+    }
+  } catch (_) {
+    // Fall back to the current browser session if the backend proof endpoint is unavailable.
+  }
   const raw = sessionStorage.getItem(LIVE_PROOF_KEY);
-  if (!raw) return;
-  let latest;
-  try { latest = JSON.parse(raw); } catch (_) { return; }
-  const { job, proof } = latest;
-  const main = document.querySelector("main");
-  const panel = main?.querySelector(".proof-panel");
-  if (!main || !panel || panel.dataset.liveProof === String(job.acpJobId)) return;
-  main.querySelector(".proof-hero .eyebrow").textContent = "Latest live partner execution";
-  main.querySelector(".proof-hero h1").textContent = "This run purchased risk synthesis through Virtuals ACP and settled it on Base.";
-  const orb = main.querySelector(".proof-hero .spend-orb");
-  if (orb) orb.innerHTML = `<small>ACP job</small><strong>${escapeHtml(job.acpJobId)}</strong><span>${escapeHtml(proof.network || "Base mainnet")}</span>`;
-  panel.dataset.liveProof = String(job.acpJobId);
-  panel.innerHTML = `<div class="proof-heading"><div><p class="eyebrow">Virtuals ACP → Base</p><h2>Current live run</h2></div><span class="status"><i>✓</i>${escapeHtml(job.status || "completed")}</span></div>
-    <div class="proof-grid"><div><span>ACP job</span><strong>${escapeHtml(job.acpJobId)}</strong></div><div><span>Provider</span><strong title="${escapeHtml(job.providerId)}">${escapeHtml(short(job.providerId))}</strong></div><div><span>Offering</span><strong>riskSynthesis</strong></div><div><span>Escrowed</span><strong>${amount(proof.escrowedAmount)} USDC</strong></div><div><span>Provider release</span><strong>${amount(proof.providerReleasedAmount)} USDC</strong></div><div><span>Network</span><strong>${escapeHtml(proof.network || "Base mainnet")}</strong></div></div>
-    <div class="transactions"><a href="${escapeHtml(proof.funding?.explorerUrl)}" target="_blank" rel="noreferrer"><span>Funding transaction</span><code>${escapeHtml(proof.funding?.transactionHash)}</code><b>View on BaseScan ↗</b></a><a href="${escapeHtml(proof.completion?.explorerUrl)}" target="_blank" rel="noreferrer"><span>Completion transaction</span><code>${escapeHtml(proof.completion?.transactionHash)}</code><b>View on BaseScan ↗</b></a></div>
-    <p class="accounting">Verified settlement from this live assessment. Historical checkpoint job 75660 remains preserved in the build artifact as corroborating proof.</p>`;
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (_) { return null; }
 }
 
-new MutationObserver(renderLatestPartnerProof).observe(document.querySelector("#app"), { childList: true, subtree: true });
-addEventListener("hashchange", renderLatestPartnerProof);
-renderLatestPartnerProof();
+async function renderLatestPartnerProof() {
+  if (location.hash !== "#partner-proof" || proofRenderInFlight) return;
+  proofRenderInFlight = true;
+  try {
+    const latest = await loadLatestPartnerProof();
+    if (!latest?.job || !latest?.proof) return;
+    const { job, proof } = latest;
+    const main = document.querySelector("main");
+    const panel = main?.querySelector(".proof-panel");
+    if (!main || !panel || panel.dataset.liveProof === String(job.acpJobId)) return;
+    const eyebrow = main.querySelector(".proof-hero .eyebrow");
+    const headline = main.querySelector(".proof-hero h1");
+    if (eyebrow) eyebrow.textContent = "Latest live partner execution";
+    if (headline) headline.textContent = "This run purchased risk synthesis through Virtuals ACP and settled it on Base.";
+    const orb = main.querySelector(".proof-hero .spend-orb");
+    if (orb) orb.innerHTML = `<small>ACP job</small><strong>${escapeHtml(job.acpJobId)}</strong><span>${escapeHtml(proof.network || "Base mainnet")}</span>`;
+    panel.dataset.liveProof = String(job.acpJobId);
+    panel.innerHTML = `<div class="proof-heading"><div><p class="eyebrow">Virtuals ACP → Base</p><h2>Current live run</h2></div><span class="status"><i>✓</i>${escapeHtml(job.status || "completed")}</span></div>
+      <div class="proof-grid"><div><span>ACP job</span><strong>${escapeHtml(job.acpJobId)}</strong></div><div><span>Provider</span><strong title="${escapeHtml(job.providerId)}">${escapeHtml(short(job.providerId))}</strong></div><div><span>Offering</span><strong>riskSynthesis</strong></div><div><span>Escrowed</span><strong>${amount(proof.escrowedAmount)} USDC</strong></div><div><span>Provider release</span><strong>${amount(proof.providerReleasedAmount)} USDC</strong></div><div><span>Network</span><strong>${escapeHtml(proof.network || "Base mainnet")}</strong></div></div>
+      <div class="transactions"><a href="${escapeHtml(proof.funding?.explorerUrl)}" target="_blank" rel="noreferrer"><span>Funding transaction</span><code>${escapeHtml(proof.funding?.transactionHash)}</code><b>View on BaseScan ↗</b></a><a href="${escapeHtml(proof.completion?.explorerUrl)}" target="_blank" rel="noreferrer"><span>Completion transaction</span><code>${escapeHtml(proof.completion?.transactionHash)}</code><b>View on BaseScan ↗</b></a></div>
+      <p class="accounting">Verified settlement from the latest live assessment. Historical checkpoint job 75660 remains preserved only as corroborating evidence.</p>`;
+  } finally {
+    proofRenderInFlight = false;
+  }
+}
+
+new MutationObserver(() => { void renderLatestPartnerProof(); }).observe(document.querySelector("#app"), { childList: true, subtree: true });
+addEventListener("hashchange", () => { void renderLatestPartnerProof(); });
+void renderLatestPartnerProof();
