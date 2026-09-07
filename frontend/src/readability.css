@@ -21,3 +21,11 @@
 .consequence-run dd { font-size: 12px; }
 .causal-strip > span { font-size: 11px; }
 .causal-strip small { font-size: 9px; }
+.purchase-memory-proof { margin-bottom: 18px; border-color: #285648; }
+.purchase-proof-grid { display: grid; grid-template-columns: 1fr auto 1.35fr auto 1.45fr auto 1.15fr; gap: 10px; align-items: stretch; }
+.purchase-proof-grid > div { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--surface); }
+.purchase-proof-grid > b { align-self: center; color: var(--green); font-size: 18px; }
+.purchase-proof-grid small { display: block; color: var(--muted); font: 9px DM Mono, monospace; text-transform: uppercase; margin-bottom: 8px; }
+.purchase-proof-grid strong { display: block; font-size: 13px; line-height: 1.45; }
+.purchase-proof-grid span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 7px; }
+@media (max-width: 900px) { .purchase-proof-grid { grid-template-columns: 1fr; }.purchase-proof-grid > b { transform: rotate(90deg); justify-self: center; } }
