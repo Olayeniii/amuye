@@ -8,6 +8,9 @@ from .objective import resolve_objective_intent
 from .sibyl_store import SibylStore
 
 
+PROGRESSIVE_PURCHASING_LESSON_ID = "lesson_progressive_specialist_purchasing_v1"
+
+
 def execute_baseline(request: JobRequest, store: SibylStore) -> tuple[dict, ReflectionResult]:
     job_id = new_id("job")
     strategy = baseline_plan(request, job_id)
@@ -36,7 +39,7 @@ def execute_baseline(request: JobRequest, store: SibylStore) -> tuple[dict, Refl
     }
     history_ref = store.write_execution_history(execution)
     lesson = LearnedLesson(
-        id="lesson_progressive_specialist_purchasing_v1",
+        id=PROGRESSIVE_PURCHASING_LESSON_ID,
         taskPattern="protocol_assessment",
         strategy="Purchase viability/onchain evidence first. Purchase risk synthesis only if viability evidence justifies continuation. Purchase security analysis only if risk evidence justifies it.",
         reasoning="The baseline bought risk and security work before viability evidence was evaluated. Viability evidence already satisfied the objective, so 85 budget units were avoidable and deeper providers lacked prior context.",
@@ -65,9 +68,20 @@ def execute_baseline(request: JobRequest, store: SibylStore) -> tuple[dict, Refl
 
 def plan_in_fresh_session(request: JobRequest, store: SibylStore):
     objective_intent = resolve_objective_intent(request)
-    # Classification deliberately precedes the read. Keep the established structural
-    # query stable so existing persisted lessons remain retrievable across planner versions.
-    lessons = store.retrieve_lessons("protocol assessment progressive specialist purchasing")
+
+    # The operational lesson has a stable identity. Read that exact Sibyl entity first so
+    # correctness does not depend on full-text ranking/tokenization. Semantic search remains
+    # available for additional lessons, but a known persisted policy must be deterministically
+    # retrievable in a fresh process.
+    lessons: list[LearnedLesson] = []
+    primary = store.get_lesson(PROGRESSIVE_PURCHASING_LESSON_ID)
+    if primary is not None:
+        lessons.append(primary)
+
+    for lesson in store.retrieve_lessons("protocol assessment progressive specialist purchasing"):
+        if lesson.id not in {item.id for item in lessons}:
+            lessons.append(lesson)
+
     return plan_with_memory(
         request, new_id("job"), lessons, objective_intent=objective_intent,
     ), lessons
