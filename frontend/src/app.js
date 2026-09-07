@@ -92,6 +92,36 @@ function memorySourcePanel(memory) {
   </details>`;
 }
 
+function visibleLesson(mode) {
+  if (mode.memory?.lessonRecord) return { lesson: mode.memory.lessonRecord, state: "recalled" };
+  if (mode.learning?.lesson) return { lesson: mode.learning.lesson, state: "learned" };
+  return null;
+}
+
+function lessonSummary(mode) {
+  const visible = visibleLesson(mode);
+  if (!visible) return "";
+  const lesson = visible.lesson;
+  const title = visible.state === "recalled" ? "What Amúyẹ recalled" : "Lesson learned this run";
+  return `<div class="source-record">
+    <div class="wide"><span>${title}</span><p>${safe(lesson.strategy)}</p></div>
+    <div class="wide"><span>Why</span><p>${safe(lesson.reasoning)}</p></div>
+  </div>`;
+}
+
+function memoryOutcome(mode) {
+  if (!mode.memory?.enabled) return "";
+  const risk = mode.evidence?.find((item) => item.role === "risk_synthesis");
+  const security = mode.graph?.find((node) => node.role === "security_analysis");
+  if (mode.memory.adapted && risk?.continueToSecurity === true && security?.status === "completed") {
+    return `<div class="source-decision"><span>Outcome this run</span><p>Memory changed when downstream work was committed, but current risk evidence still justified security analysis. The final spend therefore remained ${money(mode.execution.spent)} budget units.</p></div>`;
+  }
+  if (mode.memory.adapted && risk?.continueToSecurity === false && security?.status === "skipped") {
+    return `<div class="source-decision"><span>Outcome this run</span><p>Memory made security conditional, current risk evidence did not justify it, and the security purchase was skipped.</p></div>`;
+  }
+  return "";
+}
+
 function memoryConsequencePanel(mode) {
   if (mode.key !== "memory-off" && mode.key !== "memory-on") return "";
   const proof = data.memoryConsequence;
@@ -129,6 +159,14 @@ function memoryCausalStrip(mode) {
 
 function modePage(mode) {
   const comparison = mode.key === "memory-off" || mode.key === "memory-on" ? `<div class="comparison-bar"><span>Controlled difference</span><b class="${mode.key === "memory-off" ? "selected" : ""}">Memory OFF · security purchased · 95 units</b><b class="${mode.key === "memory-on" ? "selected" : ""}">Memory ON · security skipped · 35 units</b></div>` : "";
+  const visible = visibleLesson(mode);
+  const memoryHeading = !mode.memory.enabled
+    ? "No prior execution experience"
+    : mode.memory.lessonId
+      ? "Experience applied"
+      : visible?.state === "learned"
+        ? "Lesson learned"
+        : "No applicable experience recalled";
   return `
     <main>
       <section class="result-hero">
@@ -152,7 +190,7 @@ function modePage(mode) {
         <aside class="side-stack">
           <section class="panel memory-panel">
             <div class="panel-label"><span class="signal ${mode.memory.enabled ? "on" : ""}"></span>Sibyl memory ${mode.memory.enabled ? "ON" : "OFF"}</div>
-            <h2>${mode.memory.enabled ? "Experience recalled from Sibyl" : "No prior execution experience"}</h2>
+            <h2>${safe(memoryHeading)}</h2>
             ${mode.key === "memory-on" ? `<p class="fresh-session-statement">Fresh process. Prior conversation unavailable.<strong>Sibyl recalled ${safe(data.memoryConsequence.withExperience.recalledLessonCount)} applicable execution lesson</strong></p>` : ""}
             ${mode.key === "memory-off" ? `<p class="fresh-session-statement">Fresh process. No prior execution experience available.<strong>No Sibyl memory read for this run.</strong></p>` : ""}
             <dl class="stacked-list">
@@ -162,6 +200,8 @@ function modePage(mode) {
               <div><dt>Rule influenced</dt><dd>${safe(mode.memory.influencedRule)}</dd></div>
               <div><dt>Adapted for constraints</dt><dd>${mode.memory.adapted ? "Yes" : "No"}${mode.memory.adaptationReason ? `<small>${safe(mode.memory.adaptationReason)}</small>` : ""}</dd></div>
             </dl>
+            ${lessonSummary(mode)}
+            ${memoryOutcome(mode)}
             ${memorySourcePanel(mode.memory)}
           </section>
           <section class="panel summary-panel">
@@ -176,6 +216,7 @@ function modePage(mode) {
         <section class="panel"><div class="section-head"><div><p class="eyebrow">Accepted outputs</p><h2>Evidence</h2></div></div>${evidence(mode)}</section>
         <section class="panel learning-panel"><div class="section-head"><div><p class="eyebrow">Outcome to memory</p><h2>Learning record</h2></div><span class="confirmed">${mode.learning.confirmed ? "Confirmed" : "Pending"}</span></div>
           <p>${safe(mode.learning.reflection)}</p><div class="learning-decision"><span>Lesson decision</span><strong>${safe(mode.learning.decision)}</strong></div>
+          ${mode.learning.lesson ? `<div class="source-record"><div class="wide"><span>Learned strategy</span><p>${safe(mode.learning.lesson.strategy)}</p></div><div class="wide"><span>Reasoning</span><p>${safe(mode.learning.lesson.reasoning)}</p></div></div>` : ""}
           <div class="ref"><span>Sibyl lesson</span><code>${safe(mode.learning.lessonId)}</code></div>
           <div class="ref"><span>Evidence event</span><code>${safe(mode.learning.evidenceRefs.join(", "))}</code></div>
         </section>
@@ -237,18 +278,20 @@ function liveResultToMode(result) {
   const nodes = result.execution.nodes;
   const outputs = result.finalResult.evidence;
   const recalled = result.memory.recalledLessonIds;
+  const sourceRecords = result.memory.source?.records || [];
+  const recalledRecord = recalled.length ? sourceRecords.find((lesson) => lesson.id === recalled[0]) || null : null;
   return {
     eyebrow: "Live procurement result",
     result: result.finalResult.decision,
     verification: result.finalResult.verification,
     request: result.request,
     intent: result.strategy.objectiveIntent,
-    memory: { enabled: result.memory.enabled, lessonId: recalled[0] || null, applicability: result.memory.applicability, influencedRule: recalled.length ? result.strategy.rationale : "No operational lesson influenced this plan.", adapted: result.strategy.source === "adapted", adaptationReason: result.strategy.source === "adapted" ? result.strategy.applicabilityAssessment : null, source: result.memory.source },
+    memory: { enabled: result.memory.enabled, lessonId: recalled[0] || null, lessonRecord: recalledRecord, applicability: result.memory.applicability, influencedRule: recalled.length ? result.strategy.rationale : "No operational lesson influenced this plan.", adapted: result.strategy.source === "adapted", adaptationReason: result.strategy.source === "adapted" ? result.strategy.applicabilityAssessment : null, source: result.memory.source },
     graph: nodes.map((node) => ({ id: node.id, role: node.type, status: node.status, dependencies: node.dependencies, gate: node.conditionalTrigger, cost: node.actualCost, reason: node.mutationReason, verification: node.evaluationStatus })),
     mutations: result.execution.mutations,
     execution: { purchased: result.execution.purchasedRoles.map((role) => ({ role })), order: result.execution.purchasedRoles, spent: result.execution.spent, remaining: result.execution.remainingBudget, stoppedEarly: result.execution.stoppedEarly, stopReason: result.execution.stopReason },
     evidence: outputs,
-    learning: { reflection: [...result.reflection.successfulDecisions, ...result.reflection.failedDecisions].join(" ") || "Execution evaluated before reflection.", decision: result.lessonUpdate ? `${result.lessonUpdate.action} ${result.lessonUpdate.lesson.id}` : "Execution recorded, no lesson mutation required", lessonId: result.lessonUpdate?.lesson?.id || recalled[0] || "None", evidenceRefs: result.reflection.evidenceRefs, confirmed: true },
+    learning: { reflection: [...result.reflection.successfulDecisions, ...result.reflection.failedDecisions].join(" ") || "Execution evaluated before reflection.", decision: result.lessonUpdate ? `${result.lessonUpdate.action} ${result.lessonUpdate.lesson.id}` : "Execution recorded, no lesson mutation required", lessonId: result.lessonUpdate?.lesson?.id || recalled[0] || "None", lesson: result.lessonUpdate?.lesson || null, evidenceRefs: result.reflection.evidenceRefs, confirmed: true },
     acp: { providerMode: result.providerMode, providerJobs: result.execution.providerJobs, settlementProofs: result.settlementProofs },
   };
 }
