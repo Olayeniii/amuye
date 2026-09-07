@@ -3,6 +3,7 @@ const nativeConfirm = window.confirm.bind(window);
 const LIVE_PROOF_KEY = "amuye.latestLivePartnerProof";
 let approvedPaidJob = false;
 let proofRenderInFlight = false;
+let historyLoadInFlight = false;
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
@@ -136,6 +137,65 @@ async function renderLatestPartnerProof() {
   }
 }
 
-new MutationObserver(() => { void renderLatestPartnerProof(); }).observe(document.querySelector("#app"), { childList: true, subtree: true });
-addEventListener("hashchange", () => { void renderLatestPartnerProof(); });
+function installHistoryTab() {
+  const nav = document.querySelector("header nav");
+  if (!nav || nav.querySelector('[href="#history"]')) return;
+  const link = document.createElement("a");
+  link.href = "#history";
+  link.textContent = "History";
+  const partnerProof = nav.querySelector('[href="#partner-proof"]');
+  nav.insertBefore(link, partnerProof || null);
+}
+
+function historyStatus(job) {
+  const provider = job.providerMode === "live_acp" ? "Live ACP" : "Local";
+  const memory = job.memoryEnabled ? "Sibyl ON" : "Sibyl OFF";
+  return `${job.status || "unknown"} · ${memory} · ${provider}`;
+}
+
+async function renderHistoryPage() {
+  if (location.hash !== "#history" || historyLoadInFlight) return;
+  const main = document.querySelector("main");
+  if (!main) return;
+  historyLoadInFlight = true;
+  main.innerHTML = `<section class="result-hero"><div><p class="eyebrow">Operational record</p><h1>Assessment history</h1><p class="verified">Loading persisted assessment jobs.</p></div></section>`;
+  try {
+    const response = await nativeFetch("/api/assessments?limit=50", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "Assessment history could not be loaded");
+    const jobs = Array.isArray(payload.assessments) ? payload.assessments : [];
+    main.innerHTML = `<section class="result-hero"><div><p class="eyebrow">Operational record</p><h1>Assessment history</h1><p class="verified">Persisted separately from Sibyl learning memory and available after backend restart.</p></div><div class="spend-orb"><small>Stored</small><strong>${jobs.length}</strong><span>recent jobs</span></div></section>
+      <section class="panel timeline-panel"><div class="section-head"><div><p class="eyebrow">Recent assessments</p><h2>Job history</h2></div><span>Latest 50</span></div><div class="timeline history-list">${jobs.length ? jobs.map((job) => `<div class="history-row"><i></i><strong>${escapeHtml(job.request?.objective || job.id)}</strong><span>${escapeHtml(historyStatus(job))}</span><small>${escapeHtml(job.createdAt ? new Date(job.createdAt).toLocaleString() : "")}</small><button type="button" data-history-job="${escapeHtml(job.id)}">Open</button></div>`).join("") : `<p>No persisted assessments yet. Your next New Assessment will appear here.</p>`}</div></section>`;
+    main.querySelectorAll("[data-history-job]").forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const jobResponse = await nativeFetch(`/api/assessments/${encodeURIComponent(button.dataset.historyJob)}`, { cache: "no-store" });
+        const job = await jobResponse.json();
+        if (!jobResponse.ok) throw new Error(job.error || "Assessment could not be loaded");
+        main.innerHTML = `<section class="result-hero"><div><p class="eyebrow">Persisted assessment</p><h1>${escapeHtml(job.request?.objective || job.id)}</h1><p class="verified">${escapeHtml(historyStatus(job))}</p></div></section><section class="panel timeline-panel"><div class="section-head"><div><p class="eyebrow">Backend events</p><h2>Stored execution</h2></div><a href="#history">Back to history</a></div><div class="timeline">${(job.events || []).map((event) => `<div><i></i><strong>${escapeHtml(event.type || "event")}</strong><span>${escapeHtml(event.at ? new Date(event.at).toLocaleTimeString() : "")}</span></div>`).join("")}</div>${job.error ? `<p class="assessment-error">${escapeHtml(job.error)}</p>` : ""}</section>`;
+      } catch (error) {
+        button.disabled = false;
+        main.insertAdjacentHTML("beforeend", `<p class="assessment-error">${escapeHtml(error.message)}</p>`);
+      }
+    }));
+  } catch (error) {
+    main.innerHTML = `<section class="result-hero"><div><p class="eyebrow">Operational record</p><h1>Assessment history</h1><p class="assessment-error">${escapeHtml(error.message)}</p></div></section>`;
+  } finally {
+    historyLoadInFlight = false;
+  }
+}
+
+const appRoot = document.querySelector("#app");
+new MutationObserver(() => {
+  installHistoryTab();
+  void renderLatestPartnerProof();
+  void renderHistoryPage();
+}).observe(appRoot, { childList: true, subtree: true });
+addEventListener("hashchange", () => {
+  installHistoryTab();
+  void renderLatestPartnerProof();
+  void renderHistoryPage();
+});
+installHistoryTab();
 void renderLatestPartnerProof();
+void renderHistoryPage();
