@@ -164,6 +164,12 @@ def run_live_assessment(
         and not mandatory_security_constraint(request)
         and objective_intent.intent != "security_assessment"
     )
+    baseline_committed_downstream_work = bool(
+        result.status == "completed"
+        and strategy.source == "baseline"
+        and objective_intent.intent != "evidence_only"
+        and len(strategy.orderedSteps) > 1
+    )
     execution_record = {
         "executionId": execution_id,
         "jobId": result.jobId,
@@ -173,16 +179,30 @@ def run_live_assessment(
         "totalSpent": result.spent,
         "outcome": "protocol assessment completed" if result.status == "completed" else "protocol assessment failed",
     }
+    failed_decisions: list[str] = []
+    missed_dependencies: list[str] = []
+    if baseline_committed_downstream_work:
+        failed_decisions.append(
+            "downstream specialist purchases were committed before accepted prerequisite evidence could influence the next purchase"
+        )
+        missed_dependencies.append(
+            "downstream specialist purchasing should wait for accepted prerequisite evidence and current client constraints"
+        )
+    if security_unnecessary:
+        failed_decisions.append("security was purchased after risk evidence did not justify it")
+    progressive_change_needed = baseline_committed_downstream_work or security_unnecessary
     evaluation = evaluate_execution(
         execution_record,
         relation_to_lesson="supporting",
         outcome=execution_record["outcome"],
         successful_decisions=["specialist outputs passed their role-specific contracts"],
-        failed_decisions=(["security was purchased after risk evidence did not justify it"] if security_unnecessary else []),
+        failed_decisions=failed_decisions,
         unnecessary_purchases=(["security_analysis"] if security_unnecessary else []),
-        missed_dependencies=[],
-        useful_sequencing=(["viability evidence preceded risk synthesis"] if strategy.source == "adapted" else []),
-        proposed_strategy_changes=(["apply progressive specialist purchasing"] if security_unnecessary else ["retain current strategy"]),
+        missed_dependencies=missed_dependencies,
+        useful_sequencing=(["accepted prerequisite evidence was evaluated before downstream purchasing"] if strategy.source == "adapted" else []),
+        proposed_strategy_changes=([
+            "sequence specialist commitments so accepted prerequisite evidence can govern the next purchase"
+        ] if progressive_change_needed else ["retain current progressive specialist purchasing strategy"]),
     )
     _emit(progress, "evaluation_completed", evaluation=evaluation.to_dict())
 
@@ -211,13 +231,30 @@ def run_live_assessment(
             usefulSequencing=evaluation.usefulSequencing,
             proposedStrategyChanges=evaluation.proposedStrategyChanges,
         )
-        if security_unnecessary:
+        should_create_progressive_lesson = bool(
+            current_lesson is None
+            and result.status == "completed"
+            and objective_intent.intent != "evidence_only"
+            and len(strategy.orderedSteps) > 1
+        )
+        if should_create_progressive_lesson:
             lesson = LearnedLesson(
                 id=LESSON_ID,
                 taskPattern="protocol_assessment",
-                strategy="Purchase viability evidence first, then risk and security only when accepted evidence justifies continuation.",
-                reasoning="Evaluated execution purchased security after risk evidence rejected that continuation.",
-                applicabilityConditions=["protocol assessment", "viability evidence can inform continuation"],
+                strategy=(
+                    "Commission viability evidence first. Before committing each downstream specialist purchase, "
+                    "evaluate accepted prerequisite evidence together with the current objective and hard constraints. "
+                    "Explicitly required capabilities remain authoritative."
+                ),
+                reasoning=(
+                    "The evaluated baseline committed downstream specialist work before prerequisite evidence could "
+                    "influence subsequent purchase decisions. The reusable lesson is about commitment timing, not "
+                    "about any specific protocol or specialist always being unnecessary."
+                ),
+                applicabilityConditions=[
+                    "protocol assessment",
+                    "assessment contains downstream specialist work whose commitment can follow prerequisite evidence",
+                ],
                 nonApplicabilityConditions=["task is not a protocol assessment"],
                 supportingExecutionRefs=[evidence_ref],
                 contradictoryEvidenceRefs=[],
