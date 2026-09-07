@@ -189,7 +189,6 @@ const appRoot = document.querySelector("#app");
 new MutationObserver(() => {
   installHistoryTab();
   void renderLatestPartnerProof();
-  void renderHistoryPage();
 }).observe(appRoot, { childList: true, subtree: true });
 addEventListener("hashchange", () => {
   installHistoryTab();
