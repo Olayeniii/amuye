@@ -30,4 +30,16 @@
 .purchase-proof-grid span, .partner-live-flow span { display: block; color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 7px; }
 .partner-live-flow { margin: 16px 0 20px; }
 .live-acp-panel .section-head > span { color: var(--green); font-weight: 800; }
-@media (max-width: 900px) { .purchase-proof-grid, .partner-live-flow { grid-template-columns: 1fr; }.purchase-proof-grid > b, .partner-live-flow > b { transform: rotate(90deg); justify-self: center; } }
+.acp-confirm-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(2, 8, 7, .78); backdrop-filter: blur(8px); }
+.acp-confirm-modal { width: min(560px, 100%); border: 1px solid #285648; border-radius: 16px; padding: 28px; background: #07110f; box-shadow: 0 28px 80px rgba(0,0,0,.45); }
+.acp-confirm-modal h2 { margin: 4px 0 12px; font-size: 28px; }
+.acp-confirm-modal > p:not(.eyebrow) { color: var(--muted); line-height: 1.65; }
+.acp-confirm-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0; }
+.acp-confirm-facts > div { border: 1px solid var(--line); border-radius: 9px; padding: 13px; background: var(--surface); }
+.acp-confirm-facts span { display: block; margin-bottom: 7px; color: var(--muted); font: 9px DM Mono, monospace; text-transform: uppercase; }
+.acp-confirm-facts strong { font-size: 13px; }
+.acp-confirm-warning { padding: 11px 13px; border-left: 2px solid var(--green); background: rgba(24, 213, 157, .06); }
+.acp-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.acp-confirm-actions button { border: 1px solid var(--green); border-radius: 9px; padding: 11px 16px; background: var(--green); color: #03100c; font-weight: 800; cursor: pointer; }
+.acp-confirm-actions button.secondary { border-color: var(--line); background: transparent; color: var(--text); }
+@media (max-width: 900px) { .purchase-proof-grid, .partner-live-flow { grid-template-columns: 1fr; }.purchase-proof-grid > b, .partner-live-flow > b { transform: rotate(90deg); justify-self: center; }.acp-confirm-facts { grid-template-columns: 1fr; } }
