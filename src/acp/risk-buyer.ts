@@ -98,20 +98,30 @@ async function main(): Promise<void> {
       log(`job ${session.jobId}: funded`);
     } else if (entry.event.type === "job.submitted") {
       log(`job ${session.jobId}: deliverable received`);
+      let parsed: Record<string, unknown>;
       try {
-        current.deliverable = parseRisk(entry.event.deliverable);
-        current.deliverableRef = `acp:${session.jobId}:deliverable`;
-        current.evaluationRef = `acp:${session.jobId}:self-evaluation`;
+        parsed = parseRisk(entry.event.deliverable);
+      } catch (error) {
+        current.error = String(error);
+        log(`job ${session.jobId}: malformed deliverable rejected, ${current.error}`);
+        await session.reject("malformed risk deliverable");
+        return;
+      }
+      current.deliverable = parsed;
+      current.deliverableRef = `acp:${session.jobId}:deliverable`;
+      current.evaluationRef = `acp:${session.jobId}:self-evaluation`;
+      try {
         await session.complete("Risk output contract accepted by Amúyẹ");
         log(`job ${session.jobId}: deliverable accepted`);
       } catch (error) {
-        current.error = String(error);
-        await session.reject("malformed risk deliverable");
+        current.error = `completion transport failed: ${String(error)}`;
+        log(`job ${session.jobId}: ${current.error}; valid deliverable retained and job not rejected`);
       }
     } else if (entry.event.type === "job.completed") {
       current.status = "completed";
       current.settledCost = current.quotedCost;
       current.completedAt = new Date().toISOString();
+      current.error = undefined;
       log(`job ${session.jobId}: completed`);
       await finish(current);
     } else if (entry.event.type === "job.rejected") {
