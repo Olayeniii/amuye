@@ -1,0 +1,23 @@
+/* Demo readability overrides. Intentionally excludes assessment-form selectors. */
+.job-strip strong { font-size: 14px; }
+.constraints em { font-size: 11px; }
+.section-head > span { font-size: 11px; }
+.node-title h3 { font-size: 16px; }
+.status { font-size: 10px; }
+.node-meta dt { font-size: 10px; }
+.node-meta dd { font-size: 13px; line-height: 1.45; }
+.reason { font-size: 13px; line-height: 1.5; }
+.order span, .order b { font-size: 10px; }
+.panel-label { font-size: 11px; }
+.stacked-list dd { font-size: 14px; line-height: 1.6; }
+.stacked-list small { font-size: 12px; line-height: 1.5; }
+.summary-panel p b { font-size: 13px; line-height: 1.5; }
+.evidence-row strong { font-size: 13px; }
+.evidence-row span { font-size: 12px; line-height: 1.45; }
+.learning-panel > p { font-size: 14px; line-height: 1.7; }
+.learning-decision strong { font-size: 13px; line-height: 1.5; }
+.accounting { font-size: 13px; }
+.fresh-session-statement { font-size: 13px; line-height: 1.6; }
+.consequence-run dd { font-size: 12px; }
+.causal-strip > span { font-size: 11px; }
+.causal-strip small { font-size: 9px; }
