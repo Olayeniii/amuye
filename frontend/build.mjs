@@ -74,15 +74,9 @@ function compactRun(key, label, run, overrides = {}) {
 const modeA = compactRun("memory-off", "Memory OFF", comparison.runA_memoryOff);
 const modeB = compactRun("memory-on", "Memory ON", comparison.runB_memoryOn);
 const controlledProof = comparison.comparison;
-const memoryOffSecurity = comparison.runA_memoryOff.execution.finalGraph.find(
-  (node) => node.type === "security_analysis",
-);
-const memoryOnSecurity = comparison.runB_memoryOn.execution.finalGraph.find(
-  (node) => node.type === "security_analysis",
-);
-const memoryOnRisk = comparison.runB_memoryOn.execution.result.evidence.find(
-  (item) => item.role === "risk_synthesis",
-);
+const memoryOffSecurity = comparison.runA_memoryOff.execution.finalGraph.find((node) => node.type === "security_analysis");
+const memoryOnSecurity = comparison.runB_memoryOn.execution.finalGraph.find((node) => node.type === "security_analysis");
+const memoryOnRisk = comparison.runB_memoryOn.execution.result.evidence.find((item) => item.role === "risk_synthesis");
 const memoryConsequence = {
   withoutExperience: {
     freshProcessId: comparison.runA_memoryOff.freshProcessId,
@@ -113,17 +107,12 @@ const memoryConsequence = {
 };
 
 if (
-  memoryConsequence.withoutExperience.spend - memoryConsequence.withExperience.spend
-    !== memoryConsequence.preservedBudget
-  || memoryConsequence.withExperience.securitySkipReason
-    !== controlledProof.changedAction.memoryOnReason
+  memoryConsequence.withoutExperience.spend - memoryConsequence.withExperience.spend !== memoryConsequence.preservedBudget
+  || memoryConsequence.withExperience.securitySkipReason !== controlledProof.changedAction.memoryOnReason
   || memoryConsequence.withExperience.recalledLessonId !== controlledProof.recalledLessonId
-  || !memoryConsequence.withExperience.planningMemoryRefs.includes(
-    memoryConsequence.withExperience.recalledLessonId,
-  )
-) {
-  throw new Error("Controlled memory consequence does not match backend execution evidence");
-}
+  || !memoryConsequence.withExperience.planningMemoryRefs.includes(memoryConsequence.withExperience.recalledLessonId)
+) throw new Error("Controlled memory consequence does not match backend execution evidence");
+
 const changedRun = {
   request: adaptation.request,
   memory: {
@@ -134,9 +123,7 @@ const changedRun = {
   execution: {
     result: adaptation.finalResult,
     finalGraph: adaptation.finalGraph,
-    mutations: adaptation.mandatorySecurityEvidence.policyMutation
-      ? [adaptation.mandatorySecurityEvidence.policyMutation]
-      : [],
+    mutations: adaptation.mandatorySecurityEvidence.policyMutation ? [adaptation.mandatorySecurityEvidence.policyMutation] : [],
     providerJobsPurchased: adaptation.purchases,
     executionSequence: adaptation.executionSequence,
     spent: adaptation.spend,
@@ -161,10 +148,7 @@ const modeC = compactRun("mandatory-security", "Mandatory security", changedRun,
 });
 
 const payload = {
-  buildEvidence: {
-    commitHash,
-    builtAt: new Date().toISOString(),
-  },
+  buildEvidence: { commitHash, builtAt: new Date().toISOString() },
   product: {
     name: "Amúyẹ",
     line: "Amúyẹ remembers whether specialist work earned its cost, then uses that experience after a fresh restart to decide whether the same kind of purchase is worth making again.",
@@ -187,12 +171,8 @@ const payload = {
   },
 };
 
-if (payload.partnerProof.chainId !== 8453 || payload.partnerProof.jobId !== "75660") {
-  throw new Error("Expected Base proof for ACP job 75660");
-}
-if (payload.modes[0].execution.spent !== 95 || payload.modes[1].execution.spent !== 35) {
-  throw new Error("Controlled comparison artifact does not match expected proof");
-}
+if (payload.partnerProof.chainId !== 8453 || payload.partnerProof.jobId !== "75660") throw new Error("Expected Base proof for ACP job 75660");
+if (payload.modes[0].execution.spent !== 95 || payload.modes[1].execution.spent !== 35) throw new Error("Controlled comparison artifact does not match expected proof");
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(resolve(dist, "assets"), { recursive: true });
@@ -201,6 +181,7 @@ await cp(resolve(frontend, "src", "app.js"), resolve(dist, "app.js"));
 await cp(resolve(frontend, "src", "styles.css"), resolve(dist, "styles.css"));
 await cp(resolve(frontend, "src", "readability.css"), resolve(dist, "readability.css"));
 await cp(resolve(frontend, "src", "demo-framing.js"), resolve(dist, "demo-framing.js"));
+await cp(resolve(frontend, "src", "runtime-fixes.js"), resolve(dist, "runtime-fixes.js"));
 await cp(resolve(frontend, "assets", "amuye-logo.png"), resolve(dist, "assets", "amuye-logo.png"));
 await writeFile(resolve(dist, "demo-data.json"), `${JSON.stringify(payload, null, 2)}\n`);
 console.log(`Built Amúyẹ execution console at ${dist}`);
