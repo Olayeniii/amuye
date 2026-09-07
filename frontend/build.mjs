@@ -167,7 +167,7 @@ const payload = {
   },
   product: {
     name: "Amúyẹ",
-    line: "Give Amúyẹ a job, budget, and deadline. It buys specialist work only as evidence requires, then carries the lesson into the next run.",
+    line: "Amúyẹ remembers whether specialist work earned its cost, then uses that experience after a fresh restart to decide whether the same kind of purchase is worth making again.",
   },
   memoryConsequence,
   modes: [modeA, modeB, modeC],
@@ -200,6 +200,7 @@ await cp(resolve(frontend, "index.html"), resolve(dist, "index.html"));
 await cp(resolve(frontend, "src", "app.js"), resolve(dist, "app.js"));
 await cp(resolve(frontend, "src", "styles.css"), resolve(dist, "styles.css"));
 await cp(resolve(frontend, "src", "readability.css"), resolve(dist, "readability.css"));
+await cp(resolve(frontend, "src", "demo-framing.js"), resolve(dist, "demo-framing.js"));
 await cp(resolve(frontend, "assets", "amuye-logo.png"), resolve(dist, "assets", "amuye-logo.png"));
 await writeFile(resolve(dist, "demo-data.json"), `${JSON.stringify(payload, null, 2)}\n`);
 console.log(`Built Amúyẹ execution console at ${dist}`);
