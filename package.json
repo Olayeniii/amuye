@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "acp:risk-seller": "tsx src/acp/risk-seller.ts",
+    "acp:risk-seller": "bash -c 'set -a; [ ! -f .env ] || . ./.env; set +a; exec npx tsx src/acp/risk-seller.ts'",
     "build": "node frontend/build.mjs",
-    "console": "PYTHONPATH=src python3 -m amuye.api",
+    "console": "bash -c 'set -a; [ ! -f .env ] || . ./.env; set +a; exec env PYTHONPATH=src python3 -m amuye.api'",
     "typecheck": "tsc --noEmit --skipLibCheck --module nodenext --moduleResolution nodenext --target es2022 --types node src/acp/risk-buyer.ts src/acp/risk-seller.ts"
   },
   "dependencies": {
