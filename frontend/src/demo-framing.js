@@ -6,9 +6,35 @@ const PURCHASE_PROOF = {
   freshDecision: "Skipped on the fresh run",
 };
 
-function proofCard() {
+function activeMemoryMode(main) {
+  const selected = main.querySelector(".comparison-bar .selected")?.textContent || "";
+  if (selected.includes("Memory OFF")) return "memory-off";
+  if (selected.includes("Memory ON")) return "memory-on";
+  return null;
+}
+
+function proofCard(modeKey) {
   const section = document.createElement("section");
   section.className = "panel purchase-memory-proof";
+
+  if (modeKey === "memory-off") {
+    section.innerHTML = `
+      <div class="section-head">
+        <div><p class="eyebrow">Cold execution → full specialist path</p><h2>Why was security purchased?</h2></div>
+        <span>Memory OFF proof</span>
+      </div>
+      <div class="purchase-proof-grid">
+        <div><small>Fresh process</small><strong>No prior execution experience</strong><span>No Sibyl memory read influenced this run.</span></div>
+        <b>→</b>
+        <div><small>Cold plan</small><strong>Full specialist path retained</strong><span>There was no learned repurchase rule available to make security conditional.</span></div>
+        <b>→</b>
+        <div><small>Security decision</small><strong>Security analysis commissioned</strong><span>The cold execution purchased the deeper specialist rather than skipping it from prior experience.</span></div>
+        <b>→</b>
+        <div><small>Run outcome</small><strong>95 budget units spent</strong><span>Three specialists were commissioned.</span></div>
+      </div>`;
+    return section;
+  }
+
   section.innerHTML = `
     <div class="section-head">
       <div><p class="eyebrow">Purchase → usefulness → memory → next purchase</p><h2>Did the previous purchase earn its cost?</h2></div>
@@ -50,16 +76,17 @@ function applyPurchaseFraming() {
   const main = document.querySelector("main");
   if (!main) return;
   const consequence = main.querySelector(".memory-consequence");
-  if (consequence && !main.querySelector(".purchase-memory-proof")) {
+  const modeKey = activeMemoryMode(main);
+  if (consequence && modeKey && !main.querySelector(".purchase-memory-proof")) {
     const heading = consequence.querySelector("h2");
     if (heading) heading.textContent = "Amúyẹ remembers whether a purchase was useful, then changes the next buying decision";
     const eyebrow = consequence.querySelector(".eyebrow");
     if (eyebrow) eyebrow.textContent = "The proof";
-    consequence.insertAdjacentElement("afterend", proofCard());
+    consequence.insertAdjacentElement("afterend", proofCard(modeKey));
     const causal = main.querySelector(".causal-strip");
     if (causal) causal.setAttribute("aria-label", "Purchase usefulness memory consequence");
     const learningHeading = main.querySelector(".learning-panel h2");
-    if (learningHeading) learningHeading.textContent = "Purchase usefulness record";
+    if (learningHeading) learningHeading.textContent = modeKey === "memory-off" ? "Cold-run learning record" : "Purchase usefulness record";
   }
 
   const partnerPanel = main.querySelector(".live-acp-panel");
