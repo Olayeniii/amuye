@@ -6,7 +6,7 @@ import subprocess
 import sys
 from dataclasses import asdict
 
-from amuye.checkpoint import execute_baseline
+from amuye.checkpoint import execute_baseline, plan_in_fresh_session
 from amuye.demo import DEMO_REQUEST
 from amuye.sibyl_store import SibylStore
 
@@ -40,6 +40,19 @@ def test_checkpoint_one_survives_fresh_process_and_changes_plan(tmp_path):
     assert changed["orderedSteps"][2]["conditionalTrigger"]
 
 
+def test_known_lesson_is_recalled_from_new_store_even_if_semantic_search_misses(tmp_path, monkeypatch):
+    memory_db = tmp_path / "sibyl.db"
+    _, reflection = execute_baseline(DEMO_REQUEST, SibylStore(memory_db))
+
+    fresh_store = SibylStore(memory_db)
+    monkeypatch.setattr(fresh_store, "retrieve_lessons", lambda _terms: [])
+    strategy, recalled = plan_in_fresh_session(DEMO_REQUEST, fresh_store)
+
+    assert [lesson.id for lesson in recalled] == [reflection.proposedLessons[0].id]
+    assert strategy.source == "adapted"
+    assert strategy.memoryRefs == [reflection.proposedLessons[0].id]
+
+
 def test_no_memory_returns_baseline(tmp_path):
     request_json = json.dumps(asdict(DEMO_REQUEST))
     env = os.environ.copy()
@@ -53,4 +66,3 @@ def test_no_memory_returns_baseline(tmp_path):
         env=env,
     )
     assert json.loads(child.stdout)["strategy"]["source"] == "baseline"
-
