@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
+from urllib import request as urllib_request
 from urllib.parse import parse_qs, urlparse
 
 from .assessment_history import AssessmentHistoryStore
@@ -34,6 +36,13 @@ def live_acp_configuration() -> dict[str, Any]:
     }
 
 
+def env_flag(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class AssessmentService:
     def __init__(
         self,
@@ -45,6 +54,9 @@ class AssessmentService:
         settlement_capture: Any = None,
         acp_config: dict[str, Any] | None = None,
         history_db: str | Path | None = None,
+        allow_live_acp: bool = True,
+        proof_publish_url: str | None = None,
+        proof_publish_token: str | None = None,
     ) -> None:
         self.memory_db = Path(memory_db)
         self.partner_proof_path = self.memory_db.parent / "latest-partner-proof.json"
@@ -56,6 +68,9 @@ class AssessmentService:
         self.acp_client = acp_client
         self.settlement_capture = settlement_capture
         self.acp_config = acp_config or live_acp_configuration()
+        self.allow_live_acp = allow_live_acp
+        self.proof_publish_url = proof_publish_url
+        self.proof_publish_token = proof_publish_token
         self.jobs: dict[str, dict[str, Any]] = {}
         self.lock = threading.Lock()
 
@@ -67,6 +82,8 @@ class AssessmentService:
     def submit(self, request: dict[str, Any], *, memory_enabled: bool,
                provider_mode: str = "local", acp_confirmed: bool = False) -> str:
         resolve_objective_intent(JobRequest.from_dict(request))
+        if provider_mode == "live_acp" and not self.allow_live_acp:
+            raise ValueError("live ACP execution is disabled on this deployment")
         if provider_mode == "live_acp" and not acp_confirmed:
             raise ValueError("live ACP execution requires explicit paid-job confirmation")
         if provider_mode == "live_acp" and not self.acp_config["enabled"]:
@@ -94,6 +111,51 @@ class AssessmentService:
         ).start()
         return api_job_id
 
+    def _validate_partner_proof(self, payload: dict[str, Any]) -> None:
+        job = payload.get("job")
+        proof = payload.get("proof")
+        if not isinstance(job, dict) or not isinstance(proof, dict):
+            raise ValueError("partner proof requires job and proof objects")
+        acp_job_id = job.get("acpJobId")
+        if not acp_job_id or str(proof.get("jobId")) != str(acp_job_id):
+            raise ValueError("partner proof job IDs do not match")
+        if proof.get("chainId") != 8453:
+            raise ValueError("partner proof must be for Base mainnet chain 8453")
+        for stage in ("funding", "completion"):
+            record = proof.get(stage)
+            if not isinstance(record, dict) or not record.get("transactionHash"):
+                raise ValueError(f"partner proof requires {stage} transaction evidence")
+
+    def _write_partner_proof(self, payload: dict[str, Any]) -> None:
+        self._validate_partner_proof(payload)
+        self.partner_proof_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.partner_proof_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        temporary.replace(self.partner_proof_path)
+
+    def publish_partner_proof(self, payload: dict[str, Any]) -> None:
+        self._write_partner_proof(payload)
+
+    def _push_partner_proof(self, payload: dict[str, Any]) -> None:
+        if not self.proof_publish_url or not self.proof_publish_token:
+            return
+        body = json.dumps(payload).encode("utf-8")
+        publish_request = urllib_request.Request(
+            self.proof_publish_url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.proof_publish_token}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib_request.urlopen(publish_request, timeout=10) as response:
+                if response.status >= 300:
+                    raise OSError(f"proof publish returned HTTP {response.status}")
+        except Exception as exc:
+            print(f"Partner proof publish failed: {exc}")
+
     def _persist_partner_proof(self, result: dict[str, Any]) -> None:
         if result.get("providerMode") != "live Virtuals ACP risk purchase on Base mainnet":
             return
@@ -114,10 +176,8 @@ class AssessmentService:
                 "proof": proof,
                 "capturedAt": utc_now(),
             }
-            self.partner_proof_path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.partner_proof_path.with_suffix(".tmp")
-            temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-            temporary.replace(self.partner_proof_path)
+            self._write_partner_proof(payload)
+            self._push_partner_proof(payload)
             return
 
     def latest_partner_proof(self) -> dict[str, Any] | None:
@@ -185,16 +245,39 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
             self.end_headers()
             self.wfile.write(body)
 
+        def _read_json_body(self) -> dict[str, Any]:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict):
+                raise ValueError("request body must be a JSON object")
+            return payload
+
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
+            if parsed.path == "/api/partner-proof/publish":
+                if not service.proof_publish_token:
+                    self._json(404, {"error": "not found"})
+                    return
+                authorization = self.headers.get("Authorization", "")
+                expected = f"Bearer {service.proof_publish_token}"
+                if not hmac.compare_digest(authorization, expected):
+                    self._json(401, {"error": "unauthorized"})
+                    return
+                try:
+                    payload = self._read_json_body()
+                    service.publish_partner_proof(payload)
+                    self._json(200, {
+                        "status": "published",
+                        "jobId": payload["job"]["acpJobId"],
+                    })
+                except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                    self._json(400, {"error": str(exc)})
+                return
             if parsed.path != "/api/assessments":
                 self._json(404, {"error": "not found"})
                 return
             try:
-                length = int(self.headers.get("Content-Length", "0"))
-                payload = json.loads(self.rfile.read(length))
-                if not isinstance(payload, dict):
-                    raise ValueError("request body must be a JSON object")
+                payload = self._read_json_body()
                 JobRequest.from_dict(payload)
                 memory = parse_qs(parsed.query).get("memory", ["on"])[0].lower()
                 if memory not in {"on", "off"}:
@@ -228,14 +311,19 @@ def make_handler(service: AssessmentService, dist: Path) -> type[BaseHTTPRequest
             parsed = urlparse(self.path)
             if parsed.path == "/api/acp/config":
                 config = service.acp_config
+                enabled = bool(config["enabled"] and service.allow_live_acp)
+                if not service.allow_live_acp:
+                    status = "Live ACP is disabled on this deployment"
+                else:
+                    status = "Live ACP is configured" if config["enabled"] else "Live ACP is not configured"
                 self._json(200, {
-                    "enabled": config["enabled"],
+                    "enabled": enabled,
                     "offering": config["offering"],
                     "network": config["network"],
                     "chainId": config["chainId"],
                     "maxExpectedSpend": config["maxExpectedSpend"],
                     "asset": config["asset"],
-                    "status": "Live ACP is configured" if config["enabled"] else "Live ACP is not configured",
+                    "status": status,
                 })
                 return
             if parsed.path == "/api/partner-proof/latest":
@@ -293,11 +381,20 @@ def main() -> None:
     memory_db = Path(os.environ.get("AMUYE_MEMORY_DB", root / "artifacts" / "live" / "sibyl.db"))
     memory_db.parent.mkdir(parents=True, exist_ok=True)
     history_db = Path(os.environ.get("AMUYE_HISTORY_DB", memory_db.parent / "assessment-history.db"))
-    service = AssessmentService(memory_db, history_db=history_db)
+    service = AssessmentService(
+        memory_db,
+        history_db=history_db,
+        allow_live_acp=env_flag("AMUYE_ALLOW_LIVE_ACP", True),
+        proof_publish_url=os.environ.get("AMUYE_PROOF_PUBLISH_URL"),
+        proof_publish_token=os.environ.get("AMUYE_PROOF_PUBLISH_TOKEN"),
+    )
     server = ThreadingHTTPServer(("0.0.0.0", port), make_handler(service, dist))
     print(f"Amúyẹ live console: http://localhost:{port}")
     print(f"Assessment history: {history_db}")
-    state = "enabled with explicit confirmation" if service.acp_config["enabled"] else "not configured"
+    if not service.allow_live_acp:
+        state = "disabled on this deployment"
+    else:
+        state = "enabled with explicit confirmation" if service.acp_config["enabled"] else "not configured"
     print(f"Live ACP risk purchasing is {state}.")
     server.serve_forever()
 
