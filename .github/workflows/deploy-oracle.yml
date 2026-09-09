@@ -1,0 +1,44 @@
+name: Deploy Oracle
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-oracle
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_KEY" > ~/.ssh/amuye_deploy
+          chmod 600 ~/.ssh/amuye_deploy
+          ssh-keyscan -H "$ORACLE_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy Amuye
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          ssh -i ~/.ssh/amuye_deploy "$ORACLE_USER@$ORACLE_HOST" 'bash -se' <<'REMOTE'
+            set -euo pipefail
+            cd /opt/amuye
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+            .venv/bin/pip install -e .
+            npm install
+            npm run build
+            sudo systemctl restart amuye-api
+            sudo systemctl is-active --quiet amuye-api
+          REMOTE
