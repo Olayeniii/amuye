@@ -20,6 +20,11 @@
             heading.textContent = "Prior experience changed the plan";
           }
         });
+        document.querySelectorAll(".brand img").forEach((logo) => {
+          if (logo.getAttribute("src") !== "/assets/amuye-logo.png") {
+            logo.setAttribute("src", "/assets/amuye-logo.png");
+          }
+        });
       };
       new MutationObserver(clarifyMemoryHeading).observe(document.querySelector("#app"), { childList: true, subtree: true });
       addEventListener("hashchange", clarifyMemoryHeading);
